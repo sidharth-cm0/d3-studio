@@ -925,6 +925,33 @@ export default function App() {
     setStatus('📦 Scene exported — ready for Blender rendering')
   }
 
+  const exportCameraAnimation = () => {
+    const timeline = lastTimelineRef.current ?? resolveCurrentTimelinePlan()
+    if (!timeline.cameraTrack || timeline.cameraTrack.length === 0) {
+      setStatus('⚠️ No camera animation to export — compile an episode first')
+      return
+    }
+
+    const payload = {
+      formatVersion: SCENE_FORMAT_VERSION,
+      generatedAt: new Date().toISOString(),
+      fps: 30,
+      durationSeconds: timeline.durationSeconds,
+      cameraTrack: timeline.cameraTrack,
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `d3-camera-animation-${Date.now()}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setStatus('📸 Camera animation exported')
+  }
+
   useEffect(() => {
     const currentMount = mountRef.current
     if (!currentMount) return
@@ -1295,6 +1322,14 @@ export default function App() {
             style={{ background: isExporting ? '#334155' : '#f59e0b', color: '#1e1b0f', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: isExporting ? 'not-allowed' : 'pointer' }}
           >
             {isExporting ? '📦 Packaging...' : '📦 Export Blender .scene.json'}
+          </button>
+          <button
+            onClick={exportCameraAnimation}
+            disabled={isExporting}
+            title="Export camera animation as JSON"
+            style={{ background: isExporting ? '#334155' : '#f59e0b', color: '#1e1b0f', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, cursor: isExporting ? 'not-allowed' : 'pointer' }}
+          >
+            {isExporting ? '📸 Exporting...' : '📸 Export Camera Animation'}
           </button>
         </div>
 

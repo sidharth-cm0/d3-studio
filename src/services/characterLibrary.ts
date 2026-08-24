@@ -19,6 +19,7 @@ import {
   RuntimeActorSlot,
   D3Emotion,
   D3Gesture,
+  normalizeCharacter,
 } from '../types/d3'
 
 const DEFAULT_CUSTOM: D3CharacterCustomization = {
@@ -128,13 +129,14 @@ export class CharacterLibraryService {
   static createCharacter(partial: Partial<D3Character> & { name: string }): D3Character {
     const id = partial.id || uid('char')
     const slot = partial.preferredSlot ?? (partial.role === 'guest' || partial.role === 'supporting' ? 2 : 1)
-    const character: D3Character = {
+    const character = normalizeCharacter({
+      ...partial,
       id,
       name: partial.name,
+      continuityKey: partial.continuityKey || id,
+      tags: partial.tags || [],
       role: partial.role ?? (slot === 1 ? 'lead' : 'supporting'),
-      description: partial.description ?? `${partial.name}`,
-      personality: partial.personality,
-      appearance: partial.appearance,
+      description: partial.description ?? partial.name,
       vrmAssetUrl: partial.vrmAssetUrl ?? '/avatar.vrm',
       customization: partial.customization ?? { ...DEFAULT_CUSTOM },
       voiceProfile: partial.voiceProfile ?? {
@@ -148,7 +150,7 @@ export class CharacterLibraryService {
         defaultEmotion: 'neutral',
       },
       preferredSlot: slot,
-    }
+    })
     this.upsert(character)
     return character
   }

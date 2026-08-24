@@ -37,6 +37,7 @@ import {
   D3AudioDirective,
   validateD3Episode,
   validateStoryAnalysis,
+  normalizeCharacter,
 } from '../types/d3'
 import {
   SceneCameraKeyframe,
@@ -329,29 +330,40 @@ export class AIDirectorService {
     const characters: D3Character[] = analysis.characters.map((name, i) => {
       const rule = CHARACTER_RULES.find((r) => r.name === name)
       const role: 'host' | 'guest' = i === 0 ? 'host' : 'guest'
-      return {
-        id: i === 0 ? 'char_host' : `char_guest_${i}`,
+      const id = i === 0 ? 'char_host' : `char_guest_${i}`
+      return normalizeCharacter({
+        id,
         name,
+        continuityKey: id,
+        tags: [name.toLowerCase().replace(/\s+/g, '_'), role],
         role: rule?.role ?? role,
         description: rule?.description ?? `${name} in the story.`,
         vrmAssetUrl: '/avatar.vrm',
         customization: { ...DEFAULT_CUSTOMIZATION },
         voiceProfile: i === 0 ? { ...HOST_VOICE } : { ...GUEST_VOICE },
-      }
+        preferredSlot: i === 0 ? 1 : 2,
+      })
     })
 
     // Ensure at least two slots for the current dual-actor engine
     while (characters.length < 2) {
       const idx = characters.length
-      characters.push({
-        id: idx === 0 ? 'char_host' : 'char_guest_1',
-        name: idx === 0 ? 'Lead' : 'Supporting',
-        role: idx === 0 ? 'host' : 'guest',
-        description: idx === 0 ? 'Primary character' : 'Secondary character',
-        vrmAssetUrl: '/avatar.vrm',
-        customization: { ...DEFAULT_CUSTOMIZATION },
-        voiceProfile: idx === 0 ? { ...HOST_VOICE } : { ...GUEST_VOICE },
-      })
+      const id = idx === 0 ? 'char_host' : 'char_guest_1'
+      const name = idx === 0 ? 'Lead' : 'Supporting'
+      characters.push(
+        normalizeCharacter({
+          id,
+          name,
+          continuityKey: id,
+          tags: [name.toLowerCase()],
+          role: idx === 0 ? 'host' : 'guest',
+          description: idx === 0 ? 'Primary character' : 'Secondary character',
+          vrmAssetUrl: '/avatar.vrm',
+          customization: { ...DEFAULT_CUSTOMIZATION },
+          voiceProfile: idx === 0 ? { ...HOST_VOICE } : { ...GUEST_VOICE },
+          preferredSlot: idx === 0 ? 1 : 2,
+        })
+      )
     }
 
     const locations: D3Location[] = analysis.keyLocations.map((name, i) => {
@@ -384,6 +396,8 @@ export class AIDirectorService {
     }
 
     return {
+      stableId: uid('bible'),
+      version: '1.0.0',
       logline: analysis.premise,
       visualStyle: preferredStage === 'cyberpunk' ? 'cyberpunk' : preferredStage === 'broadcast' ? 'broadcast' : 'minimal',
       characters,
@@ -613,6 +627,7 @@ export class AIDirectorService {
       estimatedDuration: totalDuration,
       scenes,
       characters: bible.characters,
+      narrativeGoals: [analysis.premise],
     }
 
     const errors = validateD3Episode(episode)

@@ -1,3 +1,9 @@
+/**
+ * D3 Studio — Canonical data model
+ * Optimized for series / multi-episode continuity while remaining
+ * compatible with the dual-VRM runtime (slot 1 / slot 2).
+ */
+
 import {
   SceneCameraKeyframe,
   SceneDialogueEvent,
@@ -34,23 +40,44 @@ export type D3CameraShotKey =
 
 export type D3StagePresetId = 'cyberpunk' | 'broadcast' | 'minimal'
 
+export type D3TimeOfDay =
+  | 'dawn'
+  | 'morning'
+  | 'noon'
+  | 'afternoon'
+  | 'dusk'
+  | 'night'
+  | 'midnight'
+  | 'interior'
+
+export type RuntimeActorSlot = 1 | 2
+
 export interface D3Project {
   id: string
+  stableId?: string
   name: string
   version: string
   createdAt: string
   updatedAt: string
   series: D3Series
+  visualStyle?: 'cyberpunk' | 'broadcast' | 'minimal' | 'cinematic_pbr'
+  toneRules?: string[]
 }
 
 export interface D3Series {
   id: string
+  stableId?: string
   title: string
+  version?: string
   bible: D3SeriesBible
   episodes: D3Episode[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface D3SeriesBible {
+  stableId?: string
+  version?: string
   logline: string
   visualStyle: 'cyberpunk' | 'broadcast' | 'minimal' | 'cinematic_pbr'
   characters: D3Character[]
@@ -73,19 +100,24 @@ export interface D3VoiceProfile {
   preferredVoiceName?: string
 }
 
-/** Runtime engine still has two VRM slots; library maps characters onto them. */
-export type RuntimeActorSlot = 1 | 2
-
 export interface D3AnimationProfile {
   idleIntensity: number
   gestureBias: D3Gesture[]
   defaultEmotion: D3Emotion
 }
 
+/**
+ * Character is a first-class identity.
+ * `name` is required for UI, dialogue assignment, and cast display.
+ * `continuityKey` ties the same person across scenes/episodes.
+ */
 export interface D3Character {
   id: string
+  /** Display name — REQUIRED (UI, cast labels, speaker matching) */
   name: string
-  /** Legacy labels kept for export / Host-Guest scripts */
+  stableId?: string
+  continuityKey: string
+  tags: string[]
   role: 'host' | 'guest' | 'actor1' | 'actor2' | 'lead' | 'supporting' | 'extra'
   description: string
   personality?: string
@@ -94,14 +126,9 @@ export interface D3Character {
   customization: D3CharacterCustomization
   voiceProfile: D3VoiceProfile
   animationProfile?: D3AnimationProfile
-  /** Preferred runtime slot when cast is larger than 2 (1 = primary, 2 = secondary) */
   preferredSlot?: RuntimeActorSlot
 }
 
-/**
- * Maps abstract character IDs onto the current dual-VRM engine slots.
- * Slot 1 = primary / former Host, Slot 2 = secondary / former Guest.
- */
 export interface CastSlotAssignment {
   characterId: string
   slot: RuntimeActorSlot
@@ -110,7 +137,6 @@ export interface CastSlotAssignment {
 
 export interface CharacterLibraryState {
   characters: D3Character[]
-  /** Active assignment for the current episode/scene (max 2 on current engine) */
   activeCast: CastSlotAssignment[]
 }
 
@@ -122,24 +148,28 @@ export interface D3LightingPreset {
 
 export interface D3Location {
   id: string
+  stableId?: string
   name: string
   description?: string
   presetStageId: D3StagePresetId
   lightingPreset: D3LightingPreset
+  timeOfDay?: D3TimeOfDay
 }
 
 export interface D3Episode {
   id: string
+  stableId?: string
   seriesId: string
   episodeNumber: number
   title: string
   synopsis: string
   estimatedDuration: number
   scenes: D3Scene[]
-  /** Episode-level cast snapshot (subset of Series Bible characters) */
   characters?: D3Character[]
-  /** Resolved slot map for the dual-actor runtime */
   castSlots?: CastSlotAssignment[]
+  narrativeGoals?: string[]
+  audioCues?: Array<{ time: number; effectName: string }>
+  continuesFrom?: string
 }
 
 export interface D3Scene {
@@ -147,10 +177,17 @@ export interface D3Scene {
   sceneNumber: number
   title?: string
   locationId: string
+  stableId?: string
   castIds: string[]
   narrativeGoal: string
   emotionalTone: string
   shots: D3Shot[]
+  timeOfDay?: D3TimeOfDay
+  transition?: {
+    type: 'location' | 'emotion' | 'time' | 'shot'
+    trigger: string
+    durationMs: number
+  }
 }
 
 export interface D3ActionDirective {
@@ -170,6 +207,8 @@ export interface D3CameraDirective {
 export interface D3AudioDirective {
   ambientTrack?: string
   soundEffects?: Array<{ time: number; effectName: string }>
+  dialogueAudioUrl?: string
+  musicCue?: string
 }
 
 export interface D3DialogueLine {
@@ -184,6 +223,7 @@ export interface D3Performance {
   gesture?: D3Gesture
   blendshapeTrack?: Array<{ time: number; blendshapes: Record<string, number> }>
   headRotationTrack?: Array<{ time: number; quaternion: [number, number, number, number] }>
+  performanceClipId?: string
 }
 
 export interface D3Shot {
@@ -196,6 +236,7 @@ export interface D3Shot {
   actions?: D3ActionDirective[]
   performances: Record<string, D3Performance>
   audio?: D3AudioDirective
+  transition?: 'cut' | 'dissolve' | 'fade'
 }
 
 export interface D3TimelineCompilation {
@@ -283,3 +324,31 @@ export function validateD3Project(project: unknown): string[] {
   return errors
 }
 
+/** Ensure character has continuityKey + tags + name */
+export function normalizeCharacter(
+  c: Partial<D3Character> & { id: string; name: string }
+): D3Character {
+  return {
+    id: c.id,
+    name: c.name,
+    stableId: c.stableId,
+    continuityKey: c.continuityKey || c.id,
+    tags: c.tags || [],
+    role: c.role || 'lead',
+    description: c.description || c.name,
+    personality: c.personality,
+    appearance: c.appearance,
+    vrmAssetUrl: c.vrmAssetUrl || '/avatar.vrm',
+    customization: c.customization || {
+      skinColor: '#6e473b',
+      hairColor: '#140f0c',
+      shirtColor: '#2563eb',
+      hairStyle: 'short',
+      jawScale: 1.08,
+      shoulderWidth: 1.12,
+    },
+    voiceProfile: c.voiceProfile || { pitch: 1, rate: 0.98 },
+    animationProfile: c.animationProfile,
+    preferredSlot: c.preferredSlot,
+  }
+}
