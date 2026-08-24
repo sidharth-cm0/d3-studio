@@ -126,9 +126,10 @@ export default function App() {
 
   // AI Story Prompts
   const [storyPrompt, setStoryPrompt] = useState<string>(
-    'A detective enters an abandoned warehouse at midnight, looks around suspiciously, hears a sound and turns toward the shadows.'
+    "A detective enters an abandoned warehouse at midnight. He slowly walks forward, looks around suspiciously, hears a noise behind him, turns around and says, 'Who's there?'"
   )
   const [currentEpisode, setCurrentEpisode] = useState<D3Episode | null>(null)
+  const [currentSceneIndex, setCurrentSceneIndex] = useState<number>(0)
   const [selectedTimelineShot, setSelectedTimelineShot] = useState<number>(0)
   const [showTimeline, setShowTimeline] = useState<boolean>(true)
   const [isRecordingPerf, setIsRecordingPerf] = useState<boolean>(false)
@@ -342,9 +343,39 @@ export default function App() {
     }
   }
 
+  /**
+   * Vite serves index.html (content-type text/html) for missing files under /,
+   * which GLTFLoader would try to parse as JSON ("Unexpected token '<'" error).
+   * Probe local VRM paths once and cache the result so a missing file is never
+   * re-requested and its HTML response is never handed to GLTFLoader.
+   */
+  const localVrmProbeRef = useRef<Map<string, Promise<boolean>>>(new Map())
+  const probeLocalVrmUrl = (url: string): Promise<boolean> => {
+    const cached = localVrmProbeRef.current.get(url)
+    if (cached) return cached
+    const probe = fetch(url, { method: 'HEAD' })
+      .then(
+        (res) =>
+          res.ok && !(res.headers.get('content-type') || '').includes('text/html')
+      )
+      .catch(() => false)
+    localVrmProbeRef.current.set(url, probe)
+    return probe
+  }
+
   const loadActorModel = (actorNum: 1 | 2, url: string, isFallback = false) => {
     if (!sceneRef.current) return
     setStatus(`Loading Actor ${actorNum}...`)
+
+    // Local path: verify it really serves a VRM before loading; otherwise go
+    // straight to the sample VRM (uploaded blob:/https: URLs skip this check).
+    if (!isFallback && url.startsWith('/')) {
+      probeLocalVrmUrl(url).then((exists) => {
+        if (exists) loadActorModel(actorNum, url)
+        else loadActorModel(actorNum, DEFAULT_VRM_URL, true)
+      })
+      return
+    }
 
     const loader = new GLTFLoader()
     loader.register((parser) => new VRMLoaderPlugin(parser))
@@ -359,7 +390,7 @@ export default function App() {
           return
         }
         VRMUtils.removeUnnecessaryVertices(gltf.scene)
-        VRMUtils.removeUnnecessaryJoints(gltf.scene)
+        VRMUtils.combineSkeletons(gltf.scene)
         VRMUtils.rotateVRM0(vrm)
 
         const posX = actorNum === 1 ? -0.75 : 0.75
@@ -474,31 +505,92 @@ export default function App() {
 
   /**
    * Generates or retrieves the deterministic timeline plan from the canonical AI Director layer.
+   * Compiles ONLY the currently selected scene into the timeline.
    */
   const resolveCurrentTimelinePlan = () => {
-    const stageKey = (currentStage as 'cyberpunk' | 'broadcast' | 'minimal') || 'cyberpunk'
+    let stageKey = (currentStage as 'cyberpunk' | 'broadcast' | 'minimal') || 'cyberpunk'
 
     let episode: D3Episode
     if (mode === 'story') {
+      // Auto-select the stage implied by the story (e.g. abandoned warehouse
+      // at midnight → dark cyberpunk stage); fall back to user selection.
+      const detectedStage = AIDirectorService.detectStagePreset(storyPrompt)
+      if (detectedStage) {
+        stageKey = detectedStage
+        if (detectedStage !== currentStage) {
+          setCurrentStage(detectedStage)
+          buildStageEnvironment(detectedStage)
+        }
+      }
       episode = AIDirectorService.createEpisodePlan(storyPrompt, stageKey)
       setCurrentEpisode(episode)
+      setCurrentSceneIndex(0)
     } else {
+      // Legacy Script Mode keeps using the user-selected stage.
       episode = AIDirectorService.parseLegacyScriptToEpisode(multiActorPrompt, stageKey)
       setCurrentEpisode(episode)
+      setCurrentSceneIndex(0)
     }
 
-    return AIDirectorService.compileEpisodeToTimeline(episode, CINEMATIC_SHOTS)
+    // Compile ONLY the selected scene into the timeline
+    const sceneIndex = Math.min(currentSceneIndex, episode.scenes.length - 1)
+    const scene = episode.scenes[sceneIndex] || episode.scenes[0]
+    return AIDirectorService.compileSceneToTimeline(scene, episode, CINEMATIC_SHOTS)
   }
 
-  /** Recompile canonical tracks from the structured episode (timeline editor path). */
+  /** Recompile canonical tracks from the currently selected scene (timeline editor path). */
   const recompileFromEpisode = (episode: D3Episode) => {
-    const plan = AIDirectorService.compileEpisodeToTimeline(episode, CINEMATIC_SHOTS)
+    const sceneIndex = Math.min(currentSceneIndex, episode.scenes.length - 1)
+    const scene = episode.scenes[sceneIndex] || episode.scenes[0]
+    const plan = AIDirectorService.compileSceneToTimeline(scene, episode, CINEMATIC_SHOTS)
     lastTimelineRef.current = plan
     const total = episode.scenes.reduce(
       (sum, sc) => sum + sc.shots.reduce((s, sh) => s + sh.duration, 0),
       0
     )
     return { ...episode, estimatedDuration: total }
+  }
+
+  /**
+   * Select a scene by index: updates currentSceneIndex, resolves stage/location,
+   * resolves cast, and compiles ONLY that scene into the existing timeline.
+   */
+  const selectScene = (sceneIndex: number) => {
+    if (!currentEpisode) return
+    const idx = Math.max(0, Math.min(sceneIndex, currentEpisode.scenes.length - 1))
+    setCurrentSceneIndex(idx)
+
+    // Resolve stage/location from the selected scene
+    const scene = currentEpisode.scenes[idx]
+    if (scene) {
+      const location = currentEpisode.locations?.find((l) => l.id === scene.locationId)
+      if (location) {
+        const stageKey = location.presetStageId
+        if (stageKey !== currentStage) {
+          setCurrentStage(stageKey)
+          buildStageEnvironment(stageKey)
+        }
+      }
+    }
+
+    // Compile ONLY the selected scene into the timeline
+    const plan = AIDirectorService.compileSceneToTimeline(scene, currentEpisode, CINEMATIC_SHOTS)
+    lastTimelineRef.current = plan
+    setSelectedTimelineShot(0)
+    setShowTimeline(true)
+    setStatus(`🎬 Scene ${idx + 1} selected — ready to Play`)
+  }
+
+  /** Navigate to the previous scene. */
+  const goToPreviousScene = () => {
+    if (!currentEpisode || currentSceneIndex <= 0) return
+    selectScene(currentSceneIndex - 1)
+  }
+
+  /** Navigate to the next scene. */
+  const goToNextScene = () => {
+    if (!currentEpisode || currentSceneIndex >= currentEpisode.scenes.length - 1) return
+    selectScene(currentSceneIndex + 1)
   }
 
   const schedulePlanPlayback = (plan: {
@@ -517,10 +609,11 @@ export default function App() {
     activeUserPerf1Ref.current = null
     activeUserPerf2Ref.current = null
 
-    // Schedule USER performance tracks from the current episode
-    if (currentEpisode?.scenes[0]) {
+    // Schedule USER performance tracks from the currently selected scene
+    const selectedScene = currentEpisode?.scenes[currentSceneIndex]
+    if (selectedScene) {
       let tAcc = 0
-      for (const shot of currentEpisode.scenes[0].shots) {
+      for (const shot of selectedScene.shots) {
         const startT = tAcc
         for (const [pid, perf] of Object.entries(shot.performances || {})) {
           if (perf.source !== 'USER') continue
@@ -722,7 +815,7 @@ export default function App() {
   }
 
   const startPerformanceRecording = () => {
-    if (!currentEpisode?.scenes[0]?.shots[selectedTimelineShot]) {
+    if (!currentEpisode?.scenes[currentSceneIndex]?.shots[selectedTimelineShot]) {
       setStatus('⚠️ Select a shot in the timeline first')
       return
     }
@@ -738,12 +831,12 @@ export default function App() {
     isRecordingPerfRef.current = false
     setIsRecordingPerf(false)
     const recording = perfRecorderRef.current.stop()
-    if (!recording || !currentEpisode?.scenes[0]) {
+    if (!recording || !currentEpisode?.scenes[currentSceneIndex]) {
       setStatus('⚠️ Recording too short — hold still and try again')
       return
     }
     pushEpisodeUndo(currentEpisode)
-    const shot = currentEpisode.scenes[0].shots[selectedTimelineShot]
+    const shot = currentEpisode.scenes[currentSceneIndex].shots[selectedTimelineShot]
     const speakerId =
       shot.dialogue?.speakerId ||
       Object.keys(shot.performances || {})[0] ||
@@ -760,7 +853,7 @@ export default function App() {
       ...(aiPerf && aiPerf.source === 'AI' ? { [`${speakerId}__ai`]: aiPerf } : {}),
     }
     const scenes = currentEpisode.scenes.map((sc, si) => {
-      if (si !== 0) return sc
+      if (si !== currentSceneIndex) return sc
       const shots = sc.shots.map((sh, i) =>
         i === selectedTimelineShot
           ? { ...sh, performances, duration: Math.max(sh.duration, recording.duration + 0.3) }
@@ -774,8 +867,8 @@ export default function App() {
   }
 
   const togglePerformanceSource = (index: number) => {
-    if (!currentEpisode?.scenes[0]) return
-    const shot = currentEpisode.scenes[0].shots[index]
+    if (!currentEpisode?.scenes[currentSceneIndex]) return
+    const shot = currentEpisode.scenes[currentSceneIndex].shots[index]
     const keys = Object.keys(shot.performances || {}).filter((k) => !k.endsWith('__ai'))
     if (!keys.length) return
     const key = keys[0]
@@ -802,7 +895,7 @@ export default function App() {
       performances[key] = { ...perf, source: 'USER' as const }
     }
     const scenes = currentEpisode.scenes.map((sc, si) => {
-      if (si !== 0) return sc
+      if (si !== currentSceneIndex) return sc
       const shots = sc.shots.map((sh, i) => (i === index ? { ...sh, performances } : sh))
       return { ...sc, shots }
     })
@@ -1047,13 +1140,14 @@ export default function App() {
       }
     }
 
-    const clock = new THREE.Clock()
+    const timer = new THREE.Timer()
     const tempEuler = new THREE.Euler()
     const offsetVector = new THREE.Vector3()
 
     const animate = (time: number) => {
       animationFrameId = requestAnimationFrame(animate)
-      const delta = clock.getDelta()
+      timer.update()
+      const delta = timer.getDelta()
       const tSec = time * 0.001
 
       TWEEN.update(time)
@@ -1403,7 +1497,7 @@ export default function App() {
 
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
             {[
-              { label: '🕵️ Noir Mystery', prompt: 'A detective enters an abandoned warehouse at midnight, looks around suspiciously, hears a sound and turns toward the shadows.' },
+              { label: '🕵️ Noir Mystery', prompt: "A detective enters an abandoned warehouse at midnight. He slowly walks forward, looks around suspiciously, hears a noise behind him, turns around and says, 'Who's there?'" },
               { label: '⚡ Cyber Infiltration', prompt: 'A netrunner jacks into a secure corporate core, discovers illegal telemetry data, and warns their operative to disconnect immediately.' },
               { label: '🎙️ Live Breaking News', prompt: 'A news anchor presents breaking satellite data while the remote correspondent delivers live verification from the field.' },
             ].map((p, idx) => (
@@ -1517,6 +1611,86 @@ export default function App() {
                   .join(' · ') ||
                   (currentEpisode.characters || []).map((c) => c.name).join(' · ') ||
                   'Lead · Supporting'}
+              </div>
+            </div>
+          )}
+
+          {/* Scene Navigator — CHECK 9 */}
+          {currentEpisode && currentEpisode.scenes.length > 1 && (
+            <div style={{ borderTop: '1px solid #334155', paddingTop: '8px' }}>
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px' }}>
+                🎬 Episode: {currentEpisode.title} — Scene Navigator
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {currentEpisode.scenes.map((scene, idx) => {
+                  const isSelected = idx === currentSceneIndex
+                  const sceneDuration = scene.shots.reduce((s, sh) => s + sh.duration, 0)
+                  return (
+                    <button
+                      key={scene.id}
+                      onClick={() => selectScene(idx)}
+                      style={{
+                        background: isSelected ? '#4f46e5' : '#1e293b',
+                        border: isSelected ? '1px solid #a5b4fc' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '6px',
+                        padding: '6px 8px',
+                        color: isSelected ? '#fff' : '#cbd5e1',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                        {isSelected ? '▶ ' : ''}[Scene {scene.sceneNumber}] — {scene.title || `Scene ${scene.sceneNumber}`}
+                      </div>
+                      <div style={{ opacity: 0.7, display: 'flex', gap: '8px' }}>
+                        <span>⏱ {sceneDuration.toFixed(1)}s</span>
+                        <span>🎥 {scene.shots.length} shots</span>
+                        <span>🎭 {scene.castIds.length} cast</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Previous / Next — CHECK 12 */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                <button
+                  onClick={goToPreviousScene}
+                  disabled={currentSceneIndex <= 0}
+                  style={{
+                    flex: 1,
+                    background: currentSceneIndex <= 0 ? '#374151' : '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: currentSceneIndex <= 0 ? 'not-allowed' : 'pointer',
+                    opacity: currentSceneIndex <= 0 ? 0.5 : 1,
+                  }}
+                >
+                  ◀ Previous
+                </button>
+                <button
+                  onClick={goToNextScene}
+                  disabled={currentSceneIndex >= currentEpisode.scenes.length - 1}
+                  style={{
+                    flex: 1,
+                    background: currentSceneIndex >= currentEpisode.scenes.length - 1 ? '#374151' : '#3b82f6',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: currentSceneIndex >= currentEpisode.scenes.length - 1 ? 'not-allowed' : 'pointer',
+                    opacity: currentSceneIndex >= currentEpisode.scenes.length - 1 ? 0.5 : 1,
+                  }}
+                >
+                  Next ▶
+                </button>
               </div>
             </div>
           )}

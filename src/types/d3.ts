@@ -166,6 +166,12 @@ export interface D3Episode {
   estimatedDuration: number
   scenes: D3Scene[]
   characters?: D3Character[]
+  /**
+   * Episode-level location registry. Scenes reference entries by `locationId`
+   * (stable IDs) so the same physical location is reused across scenes instead
+   * of duplicated per scene.
+   */
+  locations?: D3Location[]
   castSlots?: CastSlotAssignment[]
   narrativeGoals?: string[]
   audioCues?: Array<{ time: number; effectName: string }>
@@ -244,6 +250,16 @@ export interface D3TimelineCompilation {
   dialogueTimeline: SceneDialogueEvent[]
   emoteTimeline: SceneEmoteEvent[]
   durationSeconds: number
+}
+
+/** Scene duration = sum of its shot durations (shots are the smallest timing unit). */
+export function getSceneDuration(scene: D3Scene): number {
+  return scene.shots.reduce((sum, shot) => sum + (shot.duration || 0), 0)
+}
+
+/** Episode duration = sum of scene durations (never stored independently). */
+export function getEpisodeDuration(episode: Pick<D3Episode, 'scenes'>): number {
+  return episode.scenes.reduce((sum, scene) => sum + getSceneDuration(scene), 0)
 }
 
 export interface StoryBeatAnalysis {

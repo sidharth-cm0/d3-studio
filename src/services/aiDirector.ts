@@ -6,7 +6,7 @@
  *     → analyzeStory()
  *     → createSeriesBible()
  *     → createEpisodePlan()  (scenes + shots)
- *     → compileEpisodeToTimeline()
+ *     → compileSceneToTimeline() / compileEpisodeToTimeline()
  *     → existing Three.js playback / scene export
  *
  * Also supports legacy Host:/Guest: scripts via parseLegacyScriptToEpisode().
@@ -27,6 +27,7 @@ import {
   D3Gesture,
   D3CameraShotKey,
   D3StagePresetId,
+  D3TimeOfDay,
   D3TimelineCompilation,
   StoryBeatAnalysis,
   StoryAnalysisResult,
@@ -38,6 +39,8 @@ import {
   validateD3Episode,
   validateStoryAnalysis,
   normalizeCharacter,
+  getSceneDuration,
+  getEpisodeDuration,
 } from '../types/d3'
 import {
   SceneCameraKeyframe,
@@ -63,6 +66,24 @@ function estimateSpeechSeconds(text: string): number {
 
 function clampDuration(sec: number, min = 1.2, max = 12): number {
   return Math.min(max, Math.max(min, sec))
+}
+
+/** Detects explicit time-of-day hints from the story text. */
+function detectTimeOfDay(lower: string): D3TimeOfDay | undefined {
+  const rules: Array<[RegExp, D3TimeOfDay]> = [
+    [/midnight/, 'midnight'],
+    [/\bnight\b/, 'night'],
+    [/\bdawn\b/, 'dawn'],
+    [/\bdusk\b|\bevening\b/, 'dusk'],
+    [/morning/, 'morning'],
+    [/\bnoon\b/, 'noon'],
+    [/afternoon/, 'afternoon'],
+    [/interior|indoors/, 'interior'],
+  ]
+  for (const [re, tod] of rules) {
+    if (re.test(lower)) return tod
+  }
+  return undefined
 }
 
 const DEFAULT_CUSTOMIZATION = {
@@ -131,25 +152,142 @@ function inferGesture(text: string): D3Gesture {
     if (rule.keys.some((k) => lower.includes(k))) return rule.gesture
   }
   // Default cinematic gestures for action beats without dialogue
-  if (/\b(enter|walk|approach|discover|find|hear|turn)\b/i.test(text)) {
+  // (suffix-tolerant so "walks", "hears", "turns" also match)
+  if (/\b(enter|walk|approach|discover|find|hear|turn)(?:s|ed|ing)?\b/i.test(text)) {
     return 'look_around'
   }
   return 'none'
 }
 
-function inferCamera(beat: StoryBeatAnalysis, index: number, total: number): D3CameraShotKey {
-  if (beat.cameraShot) return beat.cameraShot
-  const text = `${beat.beat} ${beat.action || ''} ${beat.dialogue || ''}`.toLowerCase()
+/**
+ * Rough tension level for a story beat (0 calm … 3 peak). Drives framing
+ * escalation: calm material holds wider/stable shots, tense material
+ * tightens and may earn a dramatic angle.
+ */
+function estimateTension(text: string, emotion?: D3Emotion): number {
+  const lower = text.toLowerCase()
+  let tension = 0
+  if (/(fear|afraid|terrified|scared|panic|danger|threat|scream|shout|yell|alarm)/.test(lower)) {
+    tension = 3
+  } else if (
+    /(noise|sound|creak|footstep|behind|sudden|reveal|shadow|blood|weapon|gun|gasps|startl)/.test(lower)
+  ) {
+    tension = 2
+  } else if (
+    /(suspicious|wary|cautious|investigat|search|scan|nervous|anxious|tense|whisper|secret|hiding|discover|uncover)/.test(
+      lower
+    )
+  ) {
+    tension = 2
+  } else if (/(angry|furious|argu|slam)/.test(lower)) {
+    tension = 2
+  }
+  if (emotion === 'suspicious' || emotion === 'surprised' || emotion === 'angry') {
+    tension = Math.max(tension, 2)
+  } else if (emotion === 'sad' || emotion === 'focused') {
+    tension = Math.max(tension, 1)
+  }
+  return tension
+}
 
-  if (index === 0) return 'two_shot_wide'
-  if (total > 1 && index === total - 1) return 'close_up'
-  if (text.includes('shadow') || text.includes('mysterious') || text.includes('reveal')) return 'dutch_angle'
-  if (text.includes('turn') || text.includes('toward') || text.includes('look')) return 'over_shoulder'
-  if (text.includes('hero') || text.includes('stand') || text.includes('power')) return 'low_angle'
-  if (beat.speaker === 'guest' || beat.speaker === 'actor2') return 'actor2_close'
-  if (beat.dialogue) return 'close_up'
-  if (beat.action) return 'low_angle'
-  return index % 2 === 0 ? 'close_up' : 'over_shoulder'
+/**
+ * Cinematic Shot Director — picks the camera shot for one story beat using
+ * generic film grammar (inferred from beat/action/emotion, never hardcoded
+ * to a specific prompt):
+ *
+ *   establishing / entering   → wide two-shot
+ *   walking / exploring       → over-the-shoulder medium tracking
+ *   suspicion / investigation → slowly tighter: wide → OTS → close-up
+ *   important dialogue        → close-up on the speaking character
+ *   emotional reaction        → close-up
+ *   fear / danger / reveal    → dutch angle ONLY for genuine instability,
+ *                               otherwise a dramatic close-up
+ *   powerful / heroic         → low angle
+ *   two-character dialogue    → two-shot establish, then alternating close-ups
+ *
+ * Continuity: prefers wide → medium/OTS → close-up as tension rises, avoids
+ * repeating distinctive shots back-to-back, never stacks dramatic angles, and
+ * lets calm moments breathe back out to wider framing.
+ */
+function chooseCinematicShot(params: {
+  beat: StoryBeatAnalysis
+  index: number
+  speakerSlot: 1 | 2
+  prevShotKey?: D3CameraShotKey
+  prevTension: number
+  establishDialogueTwoShot: boolean
+}): { shotKey: D3CameraShotKey; tension: number } {
+  const { beat, index, speakerSlot, prevShotKey, prevTension, establishDialogueTwoShot } = params
+  const text = `${beat.beat} ${beat.action || ''}`.toLowerCase()
+  const tension = estimateTension(text, beat.emotion)
+
+  const speakerCloseUp = (): D3CameraShotKey => (speakerSlot === 2 ? 'actor2_close' : 'close_up')
+
+  const entersLocation =
+    index === 0 ||
+    /\b(enters?|entering|arrives?|steps? into|walks? into|opens? the door)\b/.test(text)
+  const heroic = /(powerful|heroic|triumph|victory|stands? tall|rises?|looms?|hero)/.test(text)
+  const fearReveal =
+    /(fear|afraid|terrified|panic|danger|sudden|reveal|gasps|startl)/.test(text) ||
+    (/turn/.test(text) && tension >= 3)
+  const hasDialogue = Boolean(beat.dialogue)
+  const suspicion =
+    /(look|scan|search|examin|inspect|wary|suspicious|cautious|peer|stud(y|ies)|discover|uncover|find)/.test(text)
+  const movement =
+    /(walk|movement|moves?|moved|approach|wander|explores?|creep|forward|advance|steps?)/.test(text)
+  const stimulus = /(hear|noise|sound|creak|footstep|rustle)/.test(text)
+
+  let shotKey: D3CameraShotKey
+
+  if (entersLocation) {
+    // Establishing / entering a location → wide.
+    shotKey = 'two_shot_wide'
+  } else if (heroic) {
+    // Powerful / heroic moment → low angle.
+    shotKey = 'low_angle'
+  } else if (fearReveal) {
+    // Fear / danger / sudden reveal. The dutch angle is reserved strictly
+    // for instability — never random, never stacked back-to-back.
+    shotKey = prevShotKey === 'dutch_angle' ? 'close_up' : 'dutch_angle'
+  } else if (establishDialogueTwoShot) {
+    // Two-hander: establish the conversation spatially before coverage.
+    shotKey = 'two_shot_wide'
+  } else if (hasDialogue) {
+    // Important dialogue → close-up on whoever speaks; alternates naturally
+    // as the active speaker changes between slot 1 and slot 2.
+    shotKey = speakerCloseUp()
+  } else if (suspicion) {
+    // Suspicion / investigation → slowly tighter: wide → OTS → close-up.
+    shotKey = prevShotKey === 'two_shot_wide' ? 'over_shoulder' : 'close_up'
+  } else if (movement) {
+    // Walking / exploring → OTS tracking; re-establish space with a wide
+    // after an OTS stretch so geography stays readable.
+    shotKey = prevShotKey === 'over_shoulder' ? 'two_shot_wide' : 'over_shoulder'
+  } else if (stimulus) {
+    // Reaction to an off-screen stimulus → tight on the receiver.
+    shotKey = speakerCloseUp()
+  } else if (tension >= 2) {
+    shotKey = speakerCloseUp()
+  } else if (prevTension >= 2 && tension <= 1) {
+    // Tension released → breathe out to a wider, stable frame.
+    shotKey = 'two_shot_wide'
+  } else if (tension === 1 && prevShotKey === 'two_shot_wide') {
+    shotKey = 'over_shoulder'
+  } else {
+    shotKey = index % 2 === 0 ? 'two_shot_wide' : 'close_up'
+  }
+
+  // Continuity guard: distinctive shots shouldn't repeat back-to-back.
+  // Holds on wides/close-ups read as intentional coverage.
+  if (
+    prevShotKey &&
+    shotKey === prevShotKey &&
+    (shotKey === 'over_shoulder' || shotKey === 'low_angle' || shotKey === 'dutch_angle')
+  ) {
+    shotKey = shotKey === 'over_shoulder' ? 'two_shot_wide' : 'close_up'
+  }
+
+  return { shotKey, tension }
 }
 
 function detectGenre(lower: string): string {
@@ -234,9 +372,39 @@ function speakerFromBeat(text: string, characters: string[]): string | undefined
   return undefined
 }
 
+/**
+ * Extract single-quoted speech that may contain apostrophes/contractions,
+ * e.g. `says, 'Who's there?'` → "Who's there?".
+ * A valid opening quote must follow whitespace/punctuation; a valid closing
+ * quote must sit at end-of-text or before punctuation. This prevents plain
+ * apostrophes ("it's fine") from being mistaken for quotation marks.
+ */
+function extractSingleQuotedSpan(text: string): string | undefined {
+  const quotes: number[] = []
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "'") quotes.push(i)
+  }
+  if (quotes.length < 2) return undefined
+
+  const isOpen = (idx: number) => idx === 0 || /[\s([{"—-]/.test(text[idx - 1])
+  const isClose = (idx: number) => idx >= text.length - 1 || /[\s.,!?;:)\]}]/.test(text[idx + 1])
+
+  const open = quotes.find(isOpen)
+  if (open === undefined) return undefined
+
+  const closeCandidates = quotes.filter((q) => q > open && isClose(q))
+  const close = closeCandidates[closeCandidates.length - 1]
+  if (close === undefined || close <= open + 1) return undefined
+
+  const inner = text.slice(open + 1, close).trim()
+  return /[a-zA-Z]/.test(inner) ? inner : undefined
+}
+
 function extractDialogue(text: string): string | undefined {
-  const q = text.match(/"([^"]+)"/) || text.match(/'([^']+)'/)
-  if (q) return q[1]
+  const dq = text.match(/"([^"]+)"/)
+  if (dq) return dq[1]
+  const sq = extractSingleQuotedSpan(text)
+  if (sq) return sq
   // Legacy "Host: line"
   const legacy = text.match(/^(?:Host|Guest|Actor\s*[12])\s*:\s*(.+)$/i)
   if (legacy) return legacy[1].trim()
@@ -248,11 +416,142 @@ function extractAction(text: string, dialogue?: string): string | undefined {
     const without = text.replace(`"${dialogue}"`, '').replace(`'${dialogue}'`, '').trim()
     return without.length > 8 ? without : undefined
   }
-  // Pure action sentence
-  if (/\b(enter|walk|look|turn|hear|discover|find|approach|raise|point)\b/i.test(text)) {
+  // Pure action sentence (suffix-tolerant: walks, looks, hears, turns…)
+  if (/\b(enter|walk|look|turn|hear|discover|find|approach|raise|point)(?:s|ed|ing)?\b/i.test(text)) {
     return text
   }
   return undefined
+}
+
+// ---------------------------------------------------------------------------
+// Scene segmentation
+// ---------------------------------------------------------------------------
+
+/**
+ * Scene boundary triggers — a new scene starts when any of these fire.
+ * Each trigger is a regex tested against the lowercased beat text.
+ */
+const SCENE_BOUNDARY_TRIGGERS: Array<{ label: string; test: (lower: string, idx: number, beats: StoryBeatAnalysis[]) => boolean }> = [
+  {
+    label: 'location_change',
+    test: (lower) =>
+      /(station|platform|warehouse|studio|newsroom|office|core|tunnel|subway|building|room|chamber|street|outside|inside|enters?|arrives?)/.test(
+        lower
+      ),
+  },
+  {
+    label: 'character_entrance',
+    test: (lower) =>
+      /(sees?|spots?|notices?|appears?|approaches?|enters?|arrives?|comes?|woman|figure|stranger|man|person)/.test(
+        lower
+      ),
+  },
+  {
+    label: 'confrontation_reveal',
+    test: (lower) =>
+      /(warns?|threaten|reveal|disappear|vanish|gone|blackout|lights? out|suddenly|turns? around|face to face)/.test(
+        lower
+      ),
+  },
+  {
+    label: 'narrative_goal_change',
+    test: (lower) =>
+      /(searches?|investigat|discover|find|uncover|question|asks?|approaches?)/.test(lower),
+  },
+  {
+    label: 'time_transition',
+    test: (lower) => /(midnight|dawn|dusk|evening|morning|noon|later|then|suddenly|moment)/.test(lower),
+  },
+]
+
+/**
+ * Split story beats into 2–5 logical scenes.
+ *
+ * Strategy:
+ *  - Walk beats in order.
+ *  - Start a new scene when a boundary trigger fires AND the current scene
+ *    already has at least one beat (so we don't create empty scenes).
+ *  - Cap at 5 scenes; if we'd exceed, merge remaining beats into the last scene.
+ *  - If the story naturally has only 1 scene (no triggers fire), keep it as 1.
+ *  - If we end up with more than 5, merge tail scenes.
+ */
+function segmentBeatsIntoScenes(beats: StoryBeatAnalysis[]): StoryBeatAnalysis[][] {
+  if (beats.length === 0) return []
+  if (beats.length <= 2) return [beats]
+
+  const scenes: StoryBeatAnalysis[][] = []
+  let current: StoryBeatAnalysis[] = [beats[0]]
+
+  for (let i = 1; i < beats.length; i++) {
+    const beat = beats[i]
+    const lower = `${beat.beat || ''} ${beat.action || ''}`.toLowerCase()
+
+    // Don't start a new scene if we're already at the max
+    const canSplit = scenes.length < 4 // 4 existing + 1 current = 5 max
+
+    if (canSplit && current.length >= 1) {
+      const triggered = SCENE_BOUNDARY_TRIGGERS.some((t) => t.test(lower, i, beats))
+      if (triggered) {
+        scenes.push(current)
+        current = [beat]
+        continue
+      }
+    }
+
+    current.push(beat)
+  }
+
+  scenes.push(current)
+
+  // Merge if we somehow exceeded 5 (shouldn't happen with the cap, but safety)
+  while (scenes.length > 5) {
+    const last = scenes.pop()!
+    scenes[scenes.length - 1].push(...last)
+  }
+
+  return scenes
+}
+
+/**
+ * Generate a readable scene title from the scene's narrative content.
+ * Never hardcoded to a specific prompt — derived from beat keywords.
+ */
+function generateSceneTitle(beats: StoryBeatAnalysis[], sceneIndex: number, totalScenes: number): string {
+  const allText = beats.map((b) => `${b.beat || ''} ${b.action || ''}`).join(' ').toLowerCase()
+
+  // Keyword → title mapping (generic, not prompt-specific)
+  const titleRules: Array<{ keys: string[]; title: string }> = [
+    { keys: ['arrive', 'arrives', 'arrival', 'enter', 'enters', 'entering', 'steps into', 'walks into'], title: 'Arrival' },
+    { keys: ['radio', 'static', 'voice', 'whisper', 'warning', 'warns'], title: 'The Radio' },
+    { keys: ['woman', 'figure', 'stranger', 'encounter', 'approaches', 'approach', 'face to face'], title: 'The Encounter' },
+    { keys: ['blackout', 'lights out', 'lights suddenly', 'disappear', 'vanish', 'gone'], title: 'The Blackout' },
+    { keys: ['search', 'searches', 'investigat', 'discover', 'find', 'uncover'], title: 'The Search' },
+    { keys: ['question', 'asks', 'who are you', 'who\'s there'], title: 'The Question' },
+    { keys: ['reveal', 'reveals', 'truth', 'secret'], title: 'The Reveal' },
+    { keys: ['confront', 'confrontation', 'standoff'], title: 'The Confrontation' },
+    { keys: ['departure', 'leaves', 'exit', 'flee', 'escape'], title: 'Departure' },
+    { keys: ['station', 'platform', 'warehouse', 'studio', 'office', 'building'], title: 'At the Location' },
+  ]
+
+  for (const rule of titleRules) {
+    if (rule.keys.some((k) => allText.includes(k))) {
+      return rule.title
+    }
+  }
+
+  // Fallback: use the first beat's key action
+  const firstBeat = beats[0]?.beat || ''
+  const actionMatch = firstBeat.match(/\b(enter|arrive|discover|search|approach|hear|see|find|turn|look)\w*\b/i)
+  if (actionMatch) {
+    const verb = actionMatch[1].toLowerCase()
+    const capitalized = verb.charAt(0).toUpperCase() + verb.slice(1)
+    return `${capitalized} at the ${sceneIndex === 0 ? 'Threshold' : 'Edge'}`
+  }
+
+  // Final fallback
+  if (sceneIndex === 0) return 'Opening Scene'
+  if (sceneIndex === totalScenes - 1) return 'Final Scene'
+  return `Scene ${sceneIndex + 1}`
 }
 
 // ---------------------------------------------------------------------------
@@ -272,17 +571,12 @@ export class AIDirectorService {
     const keyLocations = detectLocations(lower)
     const sentences = splitIntoBeats(raw)
 
-    const beats: StoryBeatAnalysis[] = sentences.map((sentence, idx) => {
+    const beats: StoryBeatAnalysis[] = sentences.map((sentence) => {
       const dialogue = extractDialogue(sentence)
       const action = extractAction(sentence, dialogue)
       const speaker = speakerFromBeat(sentence, characters)
       const emotion = inferEmotion(sentence)
       const gesture = inferGesture(sentence)
-      const cameraShot = inferCamera(
-        { beat: sentence, speaker, dialogue, action, emotion, gesture },
-        idx,
-        sentences.length
-      )
 
       // Stage hint from location keywords inside this beat
       let stageId: D3StagePresetId | undefined
@@ -300,7 +594,6 @@ export class AIDirectorService {
         action,
         emotion,
         gesture,
-        cameraShot,
         stageId,
       }
     })
@@ -318,6 +611,20 @@ export class AIDirectorService {
       console.warn('[AIDirector] Story analysis validation:', errors)
     }
     return result
+  }
+
+  /**
+   * Detect the most suitable stage preset implied by the story text
+   * (e.g. abandoned warehouse at midnight → dark cyberpunk stage).
+   * Returns null when the story carries no strong location signal, letting
+   * the caller keep its currently selected stage.
+   */
+  static detectStagePreset(storyPrompt: string): D3StagePresetId | null {
+    const lower = storyPrompt.toLowerCase()
+    for (const rule of LOCATION_RULES) {
+      if (rule.keys.some((k) => lower.includes(k))) return rule.stage
+    }
+    return null
   }
 
   /**
@@ -411,7 +718,119 @@ export class AIDirectorService {
   }
 
   /**
+   * Compile a single scene's shots into cinematic camera / dialogue / emote tracks.
+   * Reuses the same shot-director logic as the full episode compilation.
+   */
+  static compileSceneToTimeline(
+    scene: D3Scene,
+    episode: D3Episode,
+    cinematicShots: Record<string, CameraShotConfig>
+  ): D3TimelineCompilation {
+    const cameraTrack: SceneCameraKeyframe[] = []
+    const dialogueTimeline: SceneDialogueEvent[] = []
+    const emoteTimeline: SceneEmoteEvent[] = []
+
+    let t = 0
+
+    for (const shot of scene.shots) {
+      const shotKey = String(shot.camera.shotKey)
+      const config = cinematicShots[shotKey] || cinematicShots['two_shot_wide']
+      const durationMs = shot.camera.transitionDurationMs ?? 1400
+
+      cameraTrack.push({
+        time: t,
+        shotKey,
+        anchor: shot.camera.anchor || config?.anchor || 'stage_center',
+        radius: config?.radius ?? 2.8,
+        phi: config?.phi ?? Math.PI / 2.1,
+        theta: config?.theta ?? 0,
+        fov: config?.fov ?? 40,
+        rollZ: shot.camera.rollZ ?? config?.rollZ ?? 0,
+        durationMs,
+        easing: 'cubic_out',
+      })
+
+      // Dialogue — map characterId → runtime slot via cast map
+      if (shot.dialogue?.text) {
+        const speakerId = shot.dialogue.speakerId
+        const actor = CharacterLibraryService.slotForCharacterId(speakerId, episode.castSlots)
+        const dur = shot.dialogue.estimatedDuration ?? estimateSpeechSeconds(shot.dialogue.text)
+        dialogueTimeline.push({
+          actor,
+          actorRole: CharacterLibraryService.roleForSlot(actor),
+          text: shot.dialogue.text,
+          startTime: t + 0.15,
+          duration: dur,
+        })
+      }
+
+      // Emotes from performances
+      for (const [perfId, perf] of Object.entries(shot.performances || {})) {
+        if (!perf.gesture || perf.gesture === 'none') continue
+        const actor = CharacterLibraryService.slotForCharacterId(perfId, episode.castSlots)
+        emoteTimeline.push({
+          actor,
+          name: perf.gesture,
+          time: t + 0.1,
+          durationEstimate: Math.min(3.2, shot.duration * 0.85),
+        })
+      }
+
+      // Fallback: action description → look_around / turn_head
+      if (
+        shot.actions?.length &&
+        !emoteTimeline.some((e) => Math.abs(e.time - t) < 0.2)
+      ) {
+        const desc = shot.actions[0].description.toLowerCase()
+        const name: D3Gesture = /turn/.test(desc)
+          ? 'turn_head'
+          : /look|scan|search/.test(desc)
+            ? 'look_around'
+            : 'look_around'
+        const actor = CharacterLibraryService.slotForCharacterId(
+          shot.actions[0].actorId,
+          episode.castSlots
+        )
+        emoteTimeline.push({
+          actor,
+          name,
+          time: t + 0.1,
+          durationEstimate: 2.8,
+        })
+      }
+
+      t += shot.duration
+    }
+
+    // Always start with an establishing camera if track is empty
+    if (cameraTrack.length === 0) {
+      const config = cinematicShots['two_shot_wide']
+      cameraTrack.push({
+        time: 0,
+        shotKey: 'two_shot_wide',
+        anchor: 'stage_center',
+        radius: config?.radius ?? 2.8,
+        phi: config?.phi ?? Math.PI / 2.1,
+        theta: 0,
+        fov: config?.fov ?? 40,
+        rollZ: 0,
+        durationMs: 1200,
+        easing: 'cubic_out',
+      })
+      t = Math.max(t, 3)
+    }
+
+    return {
+      cameraTrack,
+      dialogueTimeline,
+      emoteTimeline,
+      durationSeconds: Math.max(t, scene.shots.reduce((s, sh) => s + sh.duration, 0), 3),
+    }
+  }
+
+  /**
    * Full story → episode plan (scenes + shots with camera, dialogue, performance, actions).
+   * Segments the story into 2–5 logical scenes when the narrative warrants it.
    */
   static createEpisodePlan(
     storyPrompt: string,
@@ -421,202 +840,241 @@ export class AIDirectorService {
     const bible = this.createSeriesBible(analysis, stageKey)
     const hostId = bible.characters[0]?.id ?? 'char_host'
     const guestId = bible.characters[1]?.id ?? 'char_guest_1'
-    const locationId = bible.locations[0]?.id ?? 'loc_1'
+    const sceneTimeOfDay = detectTimeOfDay(storyPrompt.toLowerCase())
 
-    const shots: D3Shot[] = analysis.beats.map((beat, idx) => {
-      const speakerIsGuest =
-        beat.speaker === bible.characters[1]?.name ||
-        beat.speaker === 'Guest' ||
-        beat.speaker === 'guest' ||
-        beat.speaker === 'actor2'
+    // Segment beats into 2–5 logical scenes
+    const sceneGroups = segmentBeatsIntoScenes(analysis.beats)
 
-      const speakerId = speakerIsGuest ? guestId : hostId
-      const actorSlot = speakerIsGuest ? '2' : '1'
+    // Build scenes from the segmented groups
+    const scenes: D3Scene[] = sceneGroups.map((group, sIdx) => {
+      // Cinematic continuity state carried across the scene's beats.
+      const usedShotKeys: D3CameraShotKey[] = []
+      let prevTension = 0
+      let dialogueEstablished = false
 
-      const dialogueText =
-        beat.dialogue ||
-        (beat.action && !beat.dialogue
-          ? undefined
-          : beat.beat.length < 120 && !beat.action
-            ? beat.beat
-            : undefined)
+      const shots: D3Shot[] = group.map((beat, idx) => {
+        const speakerIsGuest =
+          beat.speaker === bible.characters[1]?.name ||
+          beat.speaker === 'Guest' ||
+          beat.speaker === 'guest' ||
+          beat.speaker === 'actor2'
 
-      // Generate a short spoken line when the beat is pure action (keeps TTS useful)
-      const spoken: string | undefined =
-        dialogueText ||
-        (beat.action
-          ? this.narrateAction(beat.action, beat.emotion)
-          : beat.beat)
+        const speakerId = speakerIsGuest ? guestId : hostId
+        const actorSlot = speakerIsGuest ? '2' : '1'
 
-      const speechDur = spoken ? estimateSpeechSeconds(spoken) : 2.0
-      const gesture = beat.gesture && beat.gesture !== 'none' ? beat.gesture : inferGesture(beat.beat)
-      const emotion = beat.emotion || inferEmotion(beat.beat)
-      const shotKey = inferCamera(beat, idx, analysis.beats.length)
+        const dialogueText =
+          beat.dialogue ||
+          (beat.action && !beat.dialogue
+            ? undefined
+            : beat.beat.length < 120 && !beat.action
+              ? beat.beat
+              : undefined)
 
-      const duration = clampDuration(
-        speechDur + (gesture !== 'none' ? 0.6 : 0.25) + 0.4
-      )
+        // Generate a short spoken line when the beat is pure action (keeps TTS useful)
+        const spoken: string | undefined =
+          dialogueText ||
+          (beat.action
+            ? this.narrateAction(beat.action, beat.emotion)
+            : beat.beat)
 
-      const camera: D3CameraDirective = {
-        shotKey,
-        anchor:
-          shotKey === 'actor2_close'
-            ? 'actor2_head'
-            : shotKey === 'two_shot_wide'
-              ? 'stage_center'
-              : shotKey === 'low_angle' || shotKey === 'over_shoulder'
-                ? 'actor1_chest'
-                : 'actor1_head',
-        transitionDurationMs: idx === 0 ? 900 : 1400,
-        rollZ: shotKey === 'dutch_angle' ? 0.18 : undefined,
-      }
+        const speechDur = spoken ? estimateSpeechSeconds(spoken) : 2.0
+        const gesture = beat.gesture && beat.gesture !== 'none' ? beat.gesture : inferGesture(beat.beat)
+        const emotion = beat.emotion || inferEmotion(beat.beat)
 
-      const dialogue: D3DialogueLine | undefined = spoken
-        ? {
-            speakerId,
-            text: spoken,
-            estimatedDuration: speechDur,
-          }
-        : undefined
-
-      const actions: D3ActionDirective[] = []
-      if (beat.action) {
-        actions.push({
-          actorId: speakerId,
-          type: 'physical',
-          description: beat.action,
-          duration: Math.min(3, duration * 0.7),
+        // Cinematic Shot Director: pick the shot from beat grammar + continuity.
+        const prevShotKey = usedShotKeys[usedShotKeys.length - 1]
+        const establishDialogueTwoShot =
+          bible.characters.length > 1 &&
+          Boolean(beat.dialogue) &&
+          !dialogueEstablished &&
+          idx > 0 &&
+          prevShotKey !== 'two_shot_wide'
+        const directed = chooseCinematicShot({
+          beat,
+          index: idx,
+          speakerSlot: speakerIsGuest ? 2 : 1,
+          prevShotKey,
+          prevTension,
+          establishDialogueTwoShot,
         })
-      }
+        if (beat.dialogue) dialogueEstablished = true
+        prevTension = directed.tension
+        const shotKey = directed.shotKey
+        usedShotKeys.push(shotKey)
 
-      const performances: Record<string, D3Performance> = {
-        [speakerId]: {
-          source: 'AI',
-          emotion,
-          gesture: gesture === 'none' ? undefined : gesture,
-        },
-      }
+        const pacedDuration = clampDuration(
+          speechDur + (gesture !== 'none' ? 0.6 : 0.25) + 0.4
+        )
+        // Hold each shot long enough for the action to read (no 1-second cuts).
+        const shotFloor = shotKey === 'two_shot_wide' || shotKey === 'over_shoulder' ? 2.6 : 2.0
+        const duration = Math.max(pacedDuration, shotFloor)
 
-      // Second character gets a subtle reactive performance on wider shots
-      if (shotKey === 'two_shot_wide' || shotKey === 'over_shoulder') {
-        const otherId = speakerId === hostId ? guestId : hostId
-        performances[otherId] = {
-          source: 'AI',
-          emotion: 'neutral',
-          gesture: undefined,
+        const camera: D3CameraDirective = {
+          shotKey,
+          anchor:
+            shotKey === 'actor2_close'
+              ? 'actor2_head'
+              : shotKey === 'two_shot_wide'
+                ? 'stage_center'
+                : shotKey === 'low_angle' || shotKey === 'over_shoulder'
+                  ? 'actor1_chest'
+                  : 'actor1_head',
+          transitionDurationMs: idx === 0 ? 900 : 1400,
+          rollZ: shotKey === 'dutch_angle' ? 0.18 : undefined,
         }
-      }
 
-      const audio: D3AudioDirective | undefined =
-        /noise|sound|hear|footstep|creak|thunder/i.test(beat.beat)
+        const dialogue: D3DialogueLine | undefined = spoken
           ? {
-              soundEffects: [{ time: 0.2, effectName: 'subtle_ambience_hit' }],
+              speakerId,
+              text: spoken,
+              estimatedDuration: speechDur,
             }
           : undefined
 
+        const actions: D3ActionDirective[] = []
+        if (beat.action) {
+          actions.push({
+            actorId: speakerId,
+            type: 'physical',
+            description: beat.action,
+            duration: Math.min(3, duration * 0.7),
+          })
+        }
+
+        const performances: Record<string, D3Performance> = {
+          [speakerId]: {
+            source: 'AI',
+            emotion,
+            gesture: gesture === 'none' ? undefined : gesture,
+          },
+        }
+
+        // Second character gets a subtle reactive performance on wider shots
+        if (shotKey === 'two_shot_wide' || shotKey === 'over_shoulder') {
+          const otherId = speakerId === hostId ? guestId : hostId
+          performances[otherId] = {
+            source: 'AI',
+            emotion: 'neutral',
+            gesture: undefined,
+          }
+        }
+
+        const audio: D3AudioDirective | undefined =
+          /noise|sound|hear|footstep|creak|thunder/i.test(beat.beat)
+            ? {
+                soundEffects: [{ time: 0.2, effectName: 'subtle_ambience_hit' }],
+              }
+            : undefined
+
+        return {
+          id: uid(`shot_${sIdx + 1}_${idx + 1}`),
+          shotNumber: idx + 1,
+          narrativeBeat: beat.beat,
+          camera,
+          duration,
+          dialogue,
+          actions: actions.length ? actions : undefined,
+          performances,
+          audio,
+        }
+      })
+
+      // Guarantee at least one shot per scene
+      if (shots.length === 0) {
+        shots.push({
+          id: uid(`shot_${sIdx + 1}_1`),
+          shotNumber: 1,
+          narrativeBeat: group[0]?.beat || storyPrompt,
+          camera: {
+            shotKey: 'two_shot_wide',
+            anchor: 'stage_center',
+            transitionDurationMs: 1000,
+          },
+          duration: 4,
+          dialogue: {
+            speakerId: hostId,
+            text: (group[0]?.beat || storyPrompt).slice(0, 120),
+            estimatedDuration: 3,
+          },
+          performances: {
+            [hostId]: { source: 'AI', emotion: 'neutral', gesture: 'look_around' },
+          },
+        })
+      }
+
+      // Determine the location for this scene — reuse the first location
+      // from the bible (location continuity: same logical location = same ID).
+      // If a beat carries a stage hint, prefer the matching location.
+      let locationId = bible.locations[0]?.id ?? 'loc_1'
+      for (const beat of group) {
+        if (beat.stageId) {
+          const matchingLoc = bible.locations.find((l) => l.presetStageId === beat.stageId)
+          if (matchingLoc) {
+            locationId = matchingLoc.id
+            break
+          }
+        }
+      }
+
+      // Scene-level dominant emotion
+      const dominantEmotion =
+        group.find((b) => b.emotion && b.emotion !== 'neutral')?.emotion ||
+        group[0]?.emotion ||
+        'neutral'
+
+      // Generate a readable title from narrative content
+      const title = generateSceneTitle(group, sIdx, sceneGroups.length)
+
       return {
-        id: uid(`shot_${idx + 1}`),
-        shotNumber: idx + 1,
-        narrativeBeat: beat.beat,
-        camera,
-        duration,
-        dialogue,
-        actions: actions.length ? actions : undefined,
-        performances,
-        audio,
+        id: uid(`scene_${sIdx + 1}`),
+        sceneNumber: sIdx + 1,
+        title,
+        locationId,
+        castIds: bible.characters.map((c) => c.id),
+        narrativeGoal: group[0]?.beat?.slice(0, 120) || analysis.premise.slice(0, 120) || 'Play the story beats',
+        emotionalTone: dominantEmotion !== 'neutral' ? dominantEmotion : analysis.genre,
+        shots: shots.map((sh, i) => ({ ...sh, shotNumber: i + 1 })),
+        timeOfDay: sceneTimeOfDay,
       }
     })
 
-    // Guarantee at least one shot
-    if (shots.length === 0) {
-      shots.push({
-        id: uid('shot_1'),
-        shotNumber: 1,
-        narrativeBeat: storyPrompt,
-        camera: {
-          shotKey: 'two_shot_wide',
-          anchor: 'stage_center',
-          transitionDurationMs: 1000,
-        },
-        duration: 4,
-        dialogue: {
-          speakerId: hostId,
-          text: storyPrompt.slice(0, 120),
-          estimatedDuration: 3,
-        },
-        performances: {
-          [hostId]: { source: 'AI', emotion: 'neutral', gesture: 'look_around' },
-        },
-      })
-    }
-
-    // Group shots into multiple scenes (by location shift, emotion shift, or chunk size)
-    const scenes: D3Scene[] = []
-    const maxShotsPerScene = 4
-    let sceneShots: D3Shot[] = []
-    let sceneStartIdx = 0
-
-    const flushScene = (titleHint?: string) => {
-      if (sceneShots.length === 0) return
-      const sn = scenes.length + 1
-      const locIdx = Math.min(sn - 1, bible.locations.length - 1)
-      const loc = bible.locations[Math.max(0, locIdx)]
-      const renumbered = sceneShots.map((sh, i) => ({ ...sh, shotNumber: i + 1 }))
-      scenes.push({
-        id: uid(`scene_${sn}`),
-        sceneNumber: sn,
-        title: titleHint || loc?.name || `Scene ${sn}`,
-        locationId: loc?.id || locationId,
-        castIds: bible.characters.map((c) => c.id),
-        narrativeGoal:
-          analysis.beats[sceneStartIdx]?.beat?.slice(0, 80) || analysis.premise,
-        emotionalTone:
-          analysis.beats[sceneStartIdx]?.emotion || analysis.genre,
-        shots: renumbered,
-      })
-      sceneShots = []
-      sceneStartIdx = sceneStartIdx + renumbered.length
-    }
-
-    for (let i = 0; i < shots.length; i++) {
-      const beat = analysis.beats[i]
-      const prevBeat = analysis.beats[i - 1]
-      const locationShift =
-        i > 0 &&
-        beat?.stageId &&
-        prevBeat?.stageId &&
-        beat.stageId !== prevBeat.stageId
-      const emotionShift =
-        i > 0 &&
-        beat?.emotion &&
-        prevBeat?.emotion &&
-        beat.emotion !== prevBeat.emotion &&
-        sceneShots.length >= 2
-
-      if (sceneShots.length >= maxShotsPerScene || locationShift || emotionShift) {
-        flushScene(prevBeat?.stageId ? undefined : analysis.keyLocations[scenes.length])
-      }
-      sceneShots.push(shots[i])
-    }
-    flushScene(analysis.keyLocations[scenes.length] || analysis.keyLocations[0])
-
+    // Guarantee at least one scene
     if (scenes.length === 0) {
       scenes.push({
         id: uid('scene_1'),
         sceneNumber: 1,
-        title: analysis.keyLocations[0] || 'Opening Scene',
-        locationId,
+        title: 'Opening Scene',
+        locationId: bible.locations[0]?.id ?? 'loc_1',
         castIds: bible.characters.map((c) => c.id),
-        narrativeGoal: analysis.premise,
+        narrativeGoal: analysis.premise.slice(0, 120) || 'Play the story beats',
         emotionalTone: analysis.genre,
-        shots,
+        shots: [
+          {
+            id: uid('shot_1'),
+            shotNumber: 1,
+            narrativeBeat: storyPrompt,
+            camera: {
+              shotKey: 'two_shot_wide',
+              anchor: 'stage_center',
+              transitionDurationMs: 1000,
+            },
+            duration: 4,
+            dialogue: {
+              speakerId: hostId,
+              text: storyPrompt.slice(0, 120),
+              estimatedDuration: 3,
+            },
+            performances: {
+              [hostId]: { source: 'AI', emotion: 'neutral', gesture: 'look_around' },
+            },
+          },
+        ],
+        timeOfDay: sceneTimeOfDay,
       })
     }
 
-    const totalDuration = scenes.reduce(
-      (sum, sc) => sum + sc.shots.reduce((s, sh) => s + sh.duration, 0),
-      0
-    )
+    // Episode duration = sum of scene durations (derived, never stored independently)
+    const totalDuration = getEpisodeDuration({ scenes })
 
     const episode: D3Episode = {
       id: uid('ep'),
@@ -627,6 +1085,12 @@ export class AIDirectorService {
       estimatedDuration: totalDuration,
       scenes,
       characters: bible.characters,
+      locations: bible.locations,
+      castSlots: bible.characters.map((c, i) => ({
+        characterId: c.id,
+        slot: (i === 0 ? 1 : 2) as 1 | 2,
+        displayName: c.name,
+      })),
       narrativeGoals: [analysis.premise],
     }
 
@@ -641,6 +1105,7 @@ export class AIDirectorService {
 
   /**
    * Legacy Host:/Guest: script → D3Episode (backward compatible).
+   * Produces a single scene — legacy scripts are single-scene by nature.
    */
   static parseLegacyScriptToEpisode(
     script: string,
@@ -727,7 +1192,7 @@ export class AIDirectorService {
           },
         } as D3Shot
       })
-      episode.estimatedDuration = scene.shots.reduce((s, sh) => s + sh.duration, 0)
+      episode.estimatedDuration = getEpisodeDuration({ scenes: episode.scenes })
       episode.title = 'Script Take'
       episode.synopsis = 'Legacy Host/Guest script'
       episode.characters = episode.characters || [
@@ -741,6 +1206,9 @@ export class AIDirectorService {
   /**
    * Compile structured episode into the canonical camera / dialogue / emote tracks
    * consumed by App.tsx playback and scene export.
+   *
+   * Compiles ALL scenes (used for full episode export). For playback of a single
+   * scene, use compileSceneToTimeline() instead.
    */
   static compileEpisodeToTimeline(
     episode: D3Episode,
@@ -863,7 +1331,7 @@ export class AIDirectorService {
     if (lower.includes('hear') || lower.includes('sound') || lower.includes('noise')) {
       return 'Did you hear that?'
     }
-    if (lower.includes('turn')) return 'Who is there?'
+    if (lower.includes('turn')) return 'What was that?'
     if (lower.includes('discover') || lower.includes('find') || lower.includes('photograph')) {
       return 'What is this...?'
     }
