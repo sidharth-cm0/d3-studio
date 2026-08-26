@@ -9,8 +9,8 @@
  * Changes mutate structured episode data. Parent recompiles the canonical timeline.
  */
 
-import type { CSSProperties } from 'react'
 import { D3Episode, D3Shot, D3CameraShotKey, D3Gesture } from '../types/d3'
+import './TimelineEditor.css'
 
 const CAMERA_OPTIONS: { key: D3CameraShotKey; label: string }[] = [
   { key: 'two_shot_wide', label: 'Two-Shot Wide' },
@@ -35,6 +35,8 @@ const GESTURE_OPTIONS: D3Gesture[] = [
 
 export interface TimelineEditorProps {
   episode: D3Episode
+  /** When provided, the editor shows ONLY this scene's shots (Episode Engine). */
+  activeSceneIndex?: number
   selectedShotIndex: number
   onSelectShot: (index: number) => void
   onUpdateShot: (index: number, patch: Partial<D3Shot>) => void
@@ -46,6 +48,7 @@ export interface TimelineEditorProps {
 
 export function TimelineEditor({
   episode,
+  activeSceneIndex,
   selectedShotIndex,
   onSelectShot,
   onUpdateShot,
@@ -54,22 +57,42 @@ export function TimelineEditor({
   onPlayFromShot,
   disabled,
 }: TimelineEditorProps) {
-  // Flatten shots across all scenes for a continuous timeline view
+  // Episode Engine: when activeSceneIndex is provided, show ONLY the active
+  // scene's shots so the timeline visibly switches with scene selection.
+  // Indices passed back to callbacks are LOCAL to that scene — matching the
+  // App handlers (update/delete/duplicate/Record/AI⇄USER all use the same
+  // local-index convention for the currently selected scene).
   type FlatShot = { shot: D3Shot; sceneIndex: number; localIndex: number; globalIndex: number }
+  const activeScene = activeSceneIndex != null ? episode.scenes[activeSceneIndex] : undefined
   const flat: FlatShot[] = []
-  episode.scenes.forEach((sc, sceneIndex) => {
-    sc.shots.forEach((shot, localIndex) => {
-      flat.push({ shot, sceneIndex, localIndex, globalIndex: flat.length })
+  if (activeScene) {
+    activeScene.shots.forEach((shot, localIndex) => {
+      flat.push({
+        shot,
+        sceneIndex: activeSceneIndex as number,
+        localIndex,
+        globalIndex: localIndex,
+      })
     })
-  })
+  } else {
+    // Legacy fallback: flatten across all scenes.
+    episode.scenes.forEach((sc, sceneIndex) => {
+      sc.shots.forEach((shot, localIndex) => {
+        flat.push({ shot, sceneIndex, localIndex, globalIndex: flat.length })
+      })
+    })
+  }
   const shots = flat.map((f) => f.shot)
-  const total = episode.estimatedDuration || shots.reduce((s, sh) => s + sh.duration, 0)
+  const total = activeScene
+    ? activeScene.shots.reduce((s, sh) => s + sh.duration, 0)
+    : episode.estimatedDuration || shots.reduce((s, sh) => s + sh.duration, 0)
   const selectedFlat = flat[selectedShotIndex]
   const selected = selectedFlat?.shot
-  const selectedSceneTitle = selectedFlat
-    ? episode.scenes[selectedFlat.sceneIndex]?.title || `Scene ${selectedFlat.sceneIndex + 1}`
-    : ''
-
+  const selectedSceneTitle = activeScene
+    ? activeScene.title || `Scene ${(activeSceneIndex as number) + 1}`
+    : selectedFlat
+      ? episode.scenes[selectedFlat.sceneIndex]?.title || `Scene ${selectedFlat.sceneIndex + 1}`
+      : ''
 
   // Cumulative start times for visual layout
   let cursor = 0
@@ -87,45 +110,18 @@ export function TimelineEditor({
     : undefined
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 16,
-        right: 260,
-        bottom: 70,
-        maxHeight: 200,
-        background: 'rgba(15, 23, 42, 0.94)',
-        backdropFilter: 'blur(14px)',
-        border: '1px solid rgba(255,255,255,0.14)',
-        borderRadius: 12,
-        padding: 10,
-        zIndex: 12,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        pointerEvents: disabled ? 'none' : 'auto',
-        opacity: disabled ? 0.55 : 1,
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>
-          ⏱ Timeline Editor — {shots.length} shots · {total.toFixed(1)}s
+    <div className="d3-timeline-editor" style={{ opacity: disabled ? 0.55 : 1, pointerEvents: disabled ? 'none' : 'auto' }}>
+      <div className="d3-timeline-editor__header">
+        <div className="d3-timeline-editor__title">
+          Timeline Editor — {selectedSceneTitle || 'Timeline'} · {shots.length} shots · {total.toFixed(1)}s
         </div>
-        <div style={{ fontSize: 10, color: '#64748b' }}>
+        <div className="d3-timeline-editor__subtitle">
           Edit structured episode data · recompiles on change
         </div>
       </div>
 
       {/* Shot blocks */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          overflowX: 'auto',
-          paddingBottom: 4,
-          minHeight: 44,
-        }}
-      >
+      <div className="d3-timeline-editor__track">
         {blocks.map(({ shot, index, start }) => {
           const active = index === selectedShotIndex
           const label = shot.dialogue?.text?.slice(0, 28) || shot.narrativeBeat?.slice(0, 28) || `Shot ${shot.shotNumber}`
@@ -135,32 +131,20 @@ export function TimelineEditor({
               key={shot.id}
               type="button"
               onClick={() => onSelectShot(index)}
-              style={{
-                flex: `0 0 ${width}px`,
-                width,
-                textAlign: 'left',
-                background: active ? '#4f46e5' : '#1e293b',
-                border: active ? '1px solid #a5b4fc' : '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 8,
-                padding: '6px 8px',
-                color: '#e2e8f0',
-                cursor: 'pointer',
-                fontSize: 10,
-              }}
+              className={`d3-timeline-editor__shot ${active ? 'd3-timeline-editor__shot--active' : ''}`}
+              style={{ flex: `0 0 ${width}px`, width }}
               title={`${start.toFixed(1)}s · ${shot.camera.shotKey}`}
             >
-              <div style={{ fontWeight: 700, marginBottom: 2 }}>
+              <div className="d3-timeline-editor__shot-label">
                 Sc{flat[index]?.sceneIndex + 1 || 1}.{shot.shotNumber} · {shot.camera.shotKey}
               </div>
-              <div style={{ opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {label}
-              </div>
-              <div style={{ opacity: 0.6, marginTop: 2 }}>{shot.duration.toFixed(1)}s</div>
+              <div className="d3-timeline-editor__shot-text">{label}</div>
+              <div className="d3-timeline-editor__shot-duration">{shot.duration.toFixed(1)}s</div>
             </button>
           )
         })}
         {shots.length === 0 && (
-          <div style={{ fontSize: 11, color: '#64748b', padding: 8 }}>
+          <div className="d3-timeline-editor__empty">
             Generate a scene first to edit the timeline.
           </div>
         )}
@@ -168,21 +152,12 @@ export function TimelineEditor({
 
       {/* Inspector */}
       {selected && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr 1fr auto',
-            gap: 8,
-            alignItems: 'end',
-            borderTop: '1px solid #334155',
-            paddingTop: 8,
-          }}
-        >
-          <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#38bdf8', fontWeight: 600 }}>
+        <div className="d3-timeline-editor__inspector">
+          <div className="d3-timeline-editor__inspector-title">
             {selectedSceneTitle} · Shot {selected.shotNumber}
           </div>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: '#94a3b8' }}>
+          <label className="d3-timeline-editor__field">
             Camera
             <select
               value={String(selected.camera.shotKey)}
@@ -205,7 +180,7 @@ export function TimelineEditor({
                   },
                 })
               }}
-              style={selectStyle}
+              className="d3-select d3-select--sm"
             >
               {CAMERA_OPTIONS.map((o) => (
                 <option key={o.key} value={o.key}>
@@ -215,7 +190,7 @@ export function TimelineEditor({
             </select>
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: '#94a3b8' }}>
+          <label className="d3-timeline-editor__field">
             Duration (s)
             <input
               type="number"
@@ -227,11 +202,11 @@ export function TimelineEditor({
                 const duration = Math.max(0.8, parseFloat(e.target.value) || 1)
                 onUpdateShot(selectedShotIndex, { duration })
               }}
-              style={inputStyle}
+              className="d3-input d3-input--sm"
             />
           </label>
 
-          <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 10, color: '#94a3b8' }}>
+          <label className="d3-timeline-editor__field">
             Gesture
             <select
               value={primaryPerf?.gesture || 'none'}
@@ -249,7 +224,7 @@ export function TimelineEditor({
                 }
                 onUpdateShot(selectedShotIndex, { performances })
               }}
-              style={selectStyle}
+              className="d3-select d3-select--sm"
             >
               {GESTURE_OPTIONS.map((g) => (
                 <option key={g} value={g}>
@@ -259,36 +234,27 @@ export function TimelineEditor({
             </select>
           </label>
 
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div className="d3-timeline-editor__actions">
             {onPlayFromShot && (
-              <button type="button" onClick={() => onPlayFromShot(selectedShotIndex)} style={btnStyle('#10b981')}>
+              <button type="button" onClick={() => onPlayFromShot(selectedShotIndex)} className="d3-btn d3-btn--secondary d3-btn--sm">
                 ▶
               </button>
             )}
-            <button type="button" onClick={() => onDuplicateShot(selectedShotIndex)} style={btnStyle('#334155')} title="Duplicate shot">
+            <button type="button" onClick={() => onDuplicateShot(selectedShotIndex)} className="d3-btn d3-btn--tertiary d3-btn--sm" title="Duplicate shot">
               ⧉
             </button>
             <button
               type="button"
               onClick={() => onDeleteShot(selectedShotIndex)}
               disabled={shots.length <= 1}
-              style={btnStyle(shots.length <= 1 ? '#1e293b' : '#7f1d1d')}
+              className="d3-btn d3-btn--danger d3-btn--sm"
               title="Delete shot"
             >
               ✕
             </button>
           </div>
 
-          <label
-            style={{
-              gridColumn: '1 / -1',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 4,
-              fontSize: 10,
-              color: '#94a3b8',
-            }}
-          >
+          <label className="d3-timeline-editor__field d3-timeline-editor__field--full">
             Dialogue
             <textarea
               value={selected.dialogue?.text || ''}
@@ -306,12 +272,7 @@ export function TimelineEditor({
                 })
               }}
               rows={2}
-              style={{
-                ...inputStyle,
-                resize: 'vertical',
-                minHeight: 40,
-                fontFamily: 'sans-serif',
-              }}
+              className="d3-textarea d3-textarea--sm"
               placeholder="Dialogue line for this shot…"
             />
           </label>
@@ -319,37 +280,6 @@ export function TimelineEditor({
       )}
     </div>
   )
-}
-
-const selectStyle: CSSProperties = {
-  background: '#1e293b',
-  color: '#fff',
-  border: '1px solid #475569',
-  borderRadius: 6,
-  padding: '6px 8px',
-  fontSize: 11,
-}
-
-const inputStyle: CSSProperties = {
-  background: '#1e293b',
-  color: '#fff',
-  border: '1px solid #475569',
-  borderRadius: 6,
-  padding: '6px 8px',
-  fontSize: 11,
-}
-
-function btnStyle(bg: string): CSSProperties {
-  return {
-    background: bg,
-    color: '#fff',
-    border: 'none',
-    borderRadius: 6,
-    padding: '6px 10px',
-    fontSize: 12,
-    cursor: 'pointer',
-    fontWeight: 600,
-  }
 }
 
 export default TimelineEditor

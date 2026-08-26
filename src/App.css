@@ -1,6 +1,440 @@
-/* Reset App default styles */
+/* D3 STUDIO — App-level layout styles
+   Professional dark cinematic interface.
+   Reuses design-system CSS variables. */
+
 #root {
   width: 100vw;
   height: 100vh;
 }
 
+/* ==========================================================================
+   Main application shell — grid layout
+   ========================================================================== */
+
+.d3-app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--d3-bg);
+  color: var(--d3-text);
+  font-family: var(--d3-font-family);
+  font-size: var(--d3-font-size-base);
+  font-weight: var(--d3-font-weight-regular);
+  display: grid;
+  grid-template-areas:
+    "topbar topbar topbar"
+    "sidebar viewport rightpanel"
+    "timeline timeline timeline";
+  grid-template-columns: 320px 1fr 230px;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
+}
+
+/* ==========================================================================
+   Top Bar
+   ========================================================================== */
+
+.d3-app__topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--d3-space-4);
+  height: 48px;
+  background: var(--d3-surface-1);
+  border-bottom: 1px solid var(--d3-border);
+  z-index: 20;
+}
+
+.d3-app__topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--d3-space-3);
+}
+
+.d3-app__topbar-left .d3-logo {
+  font-size: var(--d3-font-size-lg);
+  font-weight: var(--d3-font-weight-bold);
+  color: var(--d3-text);
+  letter-spacing: -0.02em;
+}
+
+.d3-app__topbar-left .d3-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--d3-surface-2);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  padding: 2px;
+}
+
+.d3-app__topbar-left .d3-nav .d3-nav-item {
+  padding: 6px 14px;
+  font-size: var(--d3-font-size-xs);
+  font-weight: var(--d3-font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--d3-text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--d3-radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.d3-app__topbar-left .d3-nav .d3-nav-item:hover {
+  color: var(--d3-text);
+}
+
+.d3-app__topbar-left .d3-nav .d3-nav-item--active {
+  background: var(--d3-surface-3);
+  color: var(--d3-text);
+  border: 1px solid var(--d3-border-hover);
+}
+
+.d3-app__topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--d3-space-2);
+}
+
+/* ==========================================================================
+   Left panel — Story / Script / Customize
+   ========================================================================== */
+
+.d3-app__sidebar {
+  grid-area: sidebar;
+  background: var(--d3-surface-1);
+  border-right: 1px solid var(--d3-border);
+  padding: var(--d3-space-4);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-4);
+}
+
+.d3-app__sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-3);
+}
+
+/* ==========================================================================
+   Viewport — the dominant area
+   ========================================================================== */
+
+.d3-app__viewport {
+  grid-area: viewport;
+  position: relative;
+  background: var(--d3-bg);
+  overflow: hidden;
+}
+
+.d3-viewport__canvas-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==========================================================================
+   Right panel — Camera
+   ========================================================================== */
+
+.d3-app__right-panel {
+  grid-area: rightpanel;
+  background: var(--d3-surface-1);
+  border-left: 1px solid var(--d3-border);
+  padding: var(--d3-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-2);
+  overflow-y: auto;
+}
+
+.d3-app__right-panel .d3-panel-title {
+  margin-bottom: var(--d3-space-2);
+}
+
+.d3-camera-shot {
+  background: var(--d3-surface-2);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  padding: 6px 10px;
+  font-size: var(--d3-font-size-sm);
+  color: var(--d3-text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.d3-camera-shot:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+
+.d3-camera-shot--selected {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+
+/* ==========================================================================
+   Bottom — Timeline
+   ========================================================================== */
+
+.d3-app__timeline {
+  grid-area: timeline;
+  background: var(--d3-surface-1);
+  border-top: 1px solid var(--d3-border);
+  padding: var(--d3-space-3);
+  overflow-x: auto;
+  z-index: 10;
+}
+
+/* ==========================================================================
+   Story panel
+   ========================================================================== */
+
+.d3-story-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.d3-panel__actions {
+  display: flex;
+  gap: var(--d3-space-2);
+  margin-top: var(--d3-space-2);
+}
+
+.d3-episode-info {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+  border-top: 1px solid var(--d3-border);
+  padding-top: var(--d3-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.d3-episode-info strong {
+  color: var(--d3-text);
+  font-weight: var(--d3-font-weight-semibold);
+}
+
+.d3-scene-navigator {
+  border-top: 1px solid var(--d3-border);
+  padding-top: var(--d3-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-1);
+}
+
+.d3-scene-navigator__title {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-muted);
+  font-weight: var(--d3-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.d3-scene-navigator__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.d3-scene-navigator__controls {
+  display: flex;
+  gap: var(--d3-space-1);
+}
+
+/* ==========================================================================
+   Stage presets
+   ========================================================================== */
+
+.d3-stage-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--d3-space-2);
+}
+
+.d3-stage-presets__label {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-muted);
+  font-weight: var(--d3-font-weight-medium);
+}
+
+/* ==========================================================================
+   Performance area (compact secondary controls)
+   ========================================================================== */
+
+.d3-performance-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--d3-space-2);
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-xl);
+  padding: var(--d3-space-2) var(--d3-space-3);
+  z-index: 10;
+}
+
+/* ==========================================================================
+   Status bar (bottom-left, above timeline)
+   ========================================================================== */
+
+.d3-status-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  padding: 4px 12px;
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+  z-index: 10;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   Actor upload controls (bottom-center)
+   ========================================================================== */
+
+.d3-actor-upload {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--d3-space-2);
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-xl);
+  padding: var(--d3-space-2) var(--d3-space-3);
+  z-index: 10;
+}
+
+/* ==========================================================================
+   MoCap video monitor
+   ========================================================================== */
+
+.d3-mocap-monitor {
+  position: absolute;
+  bottom: 80px;
+  right: 16px;
+  z-index: 10;
+}
+
+.d3-mocap-monitor video {
+  width: 160px;
+  height: 120px;
+  border-radius: var(--d3-radius-md);
+  object-fit: cover;
+  transform: scaleX(-1);
+  border: 1px solid var(--d3-border);
+  background: #000;
+}
+
+/* ==========================================================================
+   Customize panel
+   ========================================================================== */
+
+.d3-customize-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-1);
+}
+
+.d3-customize-section__label {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+  font-weight: var(--d3-font-weight-medium);
+}
+
+.d3-customize-swatches {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.d3-customize-swatches .d3-swatch {
+  width: 24px;
+  height: 24px;
+}
+
+.d3-customize-swatches .d3-swatch--circle {
+  border-radius: var(--d3-radius-pill);
+}
+
+.d3-customize-hair-style {
+  display: flex;
+  gap: 6px;
+}
+
+.d3-customize-range {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.d3-customize-range label {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+}
+
+/* ==========================================================================
+   Responsive — laptop optimization (~1280px)
+   ========================================================================== */
+
+@media (max-width: 1280px) {
+  .d3-app {
+    grid-template-columns: 260px 1fr 200px;
+  }
+
+  .d3-app__sidebar {
+    padding: var(--d3-space-3);
+  }
+
+  .d3-app__right-panel {
+    padding: var(--d3-space-3);
+  }
+}
+
+@media (max-width: 1024px) {
+  .d3-app {
+    grid-template-columns: 1fr;
+  }
+
+  .d3-app__sidebar {
+    position: absolute;
+    top: 48px;
+    left: 12px;
+    bottom: 80px;
+    width: 260px;
+    z-index: 10;
+  }
+
+  .d3-app__right-panel {
+    position: absolute;
+    top: 48px;
+    right: 12px;
+    bottom: 80px;
+    width: 200px;
+    z-index: 10;
+  }
+}

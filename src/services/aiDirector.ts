@@ -416,8 +416,8 @@ function extractAction(text: string, dialogue?: string): string | undefined {
     const without = text.replace(`"${dialogue}"`, '').replace(`'${dialogue}'`, '').trim()
     return without.length > 8 ? without : undefined
   }
-  // Pure action sentence (suffix-tolerant: walks, looks, hears, turns…)
-  if (/\b(enter|walk|look|turn|hear|discover|find|approach|raise|point)(?:s|ed|ing)?\b/i.test(text)) {
+  // Pure action sentence (suffix-tolerant: walks, looks, hears, turns, steps…)
+  if (/\b(enter|walk|look|turn|hear|discover|find|approach|raise|point|step)(?:s|ed|ing)?\b/i.test(text)) {
     return text
   }
   return undefined

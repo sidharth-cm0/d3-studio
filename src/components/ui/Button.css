@@ -1,0 +1,125 @@
+/* D3 STUDIO — Button component styles
+   Reuses design-system CSS variables. */
+
+.d3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--d3-font-family);
+  font-weight: var(--d3-font-weight-semibold);
+  border-radius: var(--d3-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.d3-btn:focus-visible {
+  outline: 2px solid var(--d3-border-hover);
+  outline-offset: 1px;
+}
+
+.d3-btn__icon {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.d3-btn__label {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* --- Primary: Generate --- */
+.d3-btn--primary {
+  background: var(--d3-accent);
+  color: var(--d3-accent-text);
+  border-color: var(--d3-accent);
+}
+.d3-btn--primary:hover {
+  background: var(--d3-accent-hover);
+  border-color: var(--d3-accent-hover);
+}
+.d3-btn--primary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* --- Secondary: Play, Export --- */
+.d3-btn--secondary {
+  background: var(--d3-surface-1);
+  color: var(--d3-text);
+  border-color: var(--d3-border);
+}
+.d3-btn--secondary:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+}
+.d3-btn--secondary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* --- Tertiary: camera / gestures / utilities --- */
+.d3-btn--tertiary {
+  background: var(--d3-surface-1);
+  color: var(--d3-text-secondary);
+  border-color: var(--d3-border);
+}
+.d3-btn--tertiary:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+.d3-btn--tertiary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* --- Danger: Stop / Delete --- */
+.d3-btn--danger {
+  background: var(--d3-danger);
+  color: #fff;
+  border-color: var(--d3-danger);
+}
+.d3-btn--danger:hover {
+  background: var(--d3-danger-hover);
+  border-color: var(--d3-danger-hover);
+}
+.d3-btn--danger:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* --- Ghost: border only --- */
+.d3-btn--ghost {
+  background: transparent;
+  color: var(--d3-text-secondary);
+  border-color: var(--d3-border);
+}
+.d3-btn--ghost:hover {
+  background: var(--d3-surface-1);
+  color: var(--d3-text);
+  border-color: var(--d3-border-hover);
+}
+
+/* --- Sizes --- */
+.d3-btn--sm  { padding: 4px 10px;  font-size: var(--d3-font-size-xs);  height: 24px; }
+.d3-btn--md  { padding: 6px 14px; font-size: var(--d3-font-size-sm);  height: 32px; }
+.d3-btn--lg  { padding: 8px 18px; font-size: var(--d3-font-size-md);  height: 40px; }
+
+/* --- Icon-only modifier --- */
+.d3-btn--icon {
+  padding: 4px 8px;
+  font-size: var(--d3-font-size-sm);
+}

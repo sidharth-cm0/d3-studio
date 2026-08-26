@@ -1,0 +1,529 @@
+/* ==========================================================================
+   D3 STUDIO — Dark Design System
+   Professional cinematic production software aesthetic.
+   ========================================================================== */
+
+:root {
+  /* Core palette */
+  --d3-bg:              #090909;
+  --d3-surface-1:       #111111;
+  --d3-surface-2:       #171717;
+  --d3-surface-3:       #1d1d1d;
+  --d3-border:          #292929;
+  --d3-border-hover:    #3a3a3a;
+  --d3-border-strong:   #555555;
+
+  /* Text */
+  --d3-text:            #f2f2f2;
+  --d3-text-secondary:  #a0a0a0;
+  --d3-text-muted:      #6f6f6f;
+  --d3-text-disabled:   #4b4b4b;
+
+  /* Accents — single restrained light accent for primary CTA */
+  --d3-accent:          #ededed;
+  --d3-accent-hover:    #ffffff;
+  --d3-accent-text:     #111111;
+
+  /* Semantic — muted, professional */
+  --d3-danger:          #ef4444;
+  --d3-danger-hover:    #f87171;
+  --d3-success:         #4d7c0f;
+  --d3-warning:         #b45309;
+  --d3-info:            #7dd3fc;
+
+  /* Spacing scale */
+  --d3-space-1: 4px;
+  --d3-space-2: 8px;
+  --d3-space-3: 12px;
+  --d3-space-4: 16px;
+  --d3-space-5: 24px;
+  --d3-space-6: 32px;
+
+  /* Border radius */
+  --d3-radius-sm: 4px;
+  --d3-radius-md: 6px;
+  --d3-radius-lg: 8px;
+  --d3-radius-xl: 12px;
+  --d3-radius-pill: 9999px;
+
+  /* Typography */
+  --d3-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --d3-font-size-xs:  10px;
+  --d3-font-size-sm:  11px;
+  --d3-font-size-md:  12px;
+  --d3-font-size-base: 13px;
+  --d3-font-size-lg:  14px;
+  --d3-font-size-xl:  16px;
+  --d3-font-size-2xl: 20px;
+  --d3-font-size-3xl: 24px;
+
+  --d3-font-weight-regular: 400;
+  --d3-font-weight-medium:  500;
+  --d3-font-weight-semibold: 600;
+  --d3-font-weight-bold:    700;
+
+  /* Layout */
+  --d3-topbar-height: 48px;
+  --d3-sidebar-width: 320px;
+  --d3-right-panel-width: 230px;
+  --d3-timeline-height: 120px;
+}
+
+/* ==========================================================================
+   Base / Reset
+   ========================================================================== */
+
+.d3-app {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--d3-bg);
+  color: var(--d3-text);
+  font-family: var(--d3-font-family);
+  font-size: var(--d3-font-size-base);
+  font-weight: var(--d3-font-weight-regular);
+}
+
+.d3-viewport {
+  width: 100%;
+  height: 100%;
+}
+
+/* ==========================================================================
+   Typography helpers
+   ========================================================================== */
+
+.d3-text-primary   { color: var(--d3-text); }
+.d3-text-secondary { color: var(--d3-text-secondary); }
+.d3-text-muted     { color: var(--d3-text-muted); }
+.d3-text-disabled  { color: var(--d3-text-disabled); }
+
+.d3-heading-app     { font-size: var(--d3-font-size-2xl); font-weight: var(--d3-font-weight-bold);   letter-spacing: -0.02em; }
+.d3-heading-panel   { font-size: var(--d3-font-size-sm);  font-weight: var(--d3-font-weight-semibold); text-transform: uppercase; letter-spacing: 0.04em; }
+.d3-label           { font-size: var(--d3-font-size-xs);  font-weight: var(--d3-font-weight-medium); color: var(--d3-text-secondary); }
+.d3-body            { font-size: var(--d3-font-size-sm);  font-weight: var(--d3-font-weight-regular); color: var(--d3-text); }
+.d3-meta            { font-size: var(--d3-font-size-xs);  font-weight: var(--d3-font-weight-regular); color: var(--d3-text-muted); }
+
+/* ==========================================================================
+   Panel (surface container)
+   ========================================================================== */
+
+.d3-panel {
+  background: var(--d3-surface-2);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-xl);
+  padding: var(--d3-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--d3-space-3);
+}
+
+.d3-panel--compact {
+  padding: var(--d3-space-3);
+  gap: var(--d3-space-2);
+}
+
+.d3-panel--elevated {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+}
+
+.d3-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--d3-space-2);
+}
+
+.d3-panel-title {
+  font-size: var(--d3-font-size-sm);
+  font-weight: var(--d3-font-weight-semibold);
+  color: var(--d3-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ==========================================================================
+   Button
+   ========================================================================== */
+
+.d3-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--d3-font-family);
+  font-weight: var(--d3-font-weight-semibold);
+  border-radius: var(--d3-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.d3-btn:focus-visible {
+  outline: 2px solid var(--d3-border-hover);
+  outline-offset: 1px;
+}
+
+/* Primary — Generate */
+.d3-btn--primary {
+  background: var(--d3-accent);
+  color: var(--d3-accent-text);
+  border-color: var(--d3-accent);
+}
+.d3-btn--primary:hover {
+  background: var(--d3-accent-hover);
+  border-color: var(--d3-accent-hover);
+}
+.d3-btn--primary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* Secondary — Play, Export */
+.d3-btn--secondary {
+  background: var(--d3-surface-1);
+  color: var(--d3-text);
+  border-color: var(--d3-border);
+}
+.d3-btn--secondary:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+}
+.d3-btn--secondary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* Tertiary — utility, camera controls, gestures */
+.d3-btn--tertiary {
+  background: var(--d3-surface-1);
+  color: var(--d3-text-secondary);
+  border-color: var(--d3-border);
+}
+.d3-btn--tertiary:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+.d3-btn--tertiary:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* Danger — Stop, Delete */
+.d3-btn--danger {
+  background: var(--d3-danger);
+  color: #fff;
+  border-color: var(--d3-danger);
+}
+.d3-btn--danger:hover {
+  background: var(--d3-danger-hover);
+  border-color: var(--d3-danger-hover);
+}
+.d3-btn--danger:disabled {
+  background: var(--d3-surface-3);
+  color: var(--d3-text-disabled);
+  border-color: var(--d3-border);
+  cursor: not-allowed;
+}
+
+/* Ghost — no background, border only */
+.d3-btn--ghost {
+  background: transparent;
+  color: var(--d3-text-secondary);
+  border-color: var(--d3-border);
+}
+.d3-btn--ghost:hover {
+  background: var(--d3-surface-1);
+  color: var(--d3-text);
+  border-color: var(--d3-border-hover);
+}
+
+/* Sizes */
+.d3-btn--sm  { padding: 4px 10px;  font-size: var(--d3-font-size-xs);  height: 24px; }
+.d3-btn--md  { padding: 6px 14px; font-size: var(--d3-font-size-sm);  height: 32px; }
+.d3-btn--lg  { padding: 8px 18px; font-size: var(--d3-font-size-md);  height: 40px; }
+
+/* Icon-only */
+.d3-btn--icon {
+  padding: 4px 8px;
+  font-size: var(--d3-font-size-sm);
+}
+
+/* ==========================================================================
+   Segmented Control
+   ========================================================================== */
+
+.d3-segmented {
+  display: inline-flex;
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  padding: 2px;
+  gap: 1px;
+}
+
+.d3-segmented-option {
+  flex: 1;
+  background: transparent;
+  color: var(--d3-text-secondary);
+  border: none;
+  border-radius: var(--d3-radius-sm);
+  padding: 4px 12px;
+  font-size: var(--d3-font-size-xs);
+  font-weight: var(--d3-font-weight-medium);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.d3-segmented-option:hover {
+  color: var(--d3-text);
+}
+
+.d3-segmented-option--active {
+  background: var(--d3-surface-3);
+  color: var(--d3-text);
+  border: 1px solid var(--d3-border-hover);
+}
+
+/* ==========================================================================
+   Inputs
+   ========================================================================== */
+
+.d3-input,
+.d3-select,
+.d3-textarea {
+  width: 100%;
+  font-family: var(--d3-font-family);
+  font-size: var(--d3-font-size-sm);
+  font-weight: var(--d3-font-weight-regular);
+  color: var(--d3-text);
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.d3-input:focus,
+.d3-select:focus,
+.d3-textarea:focus {
+  border-color: var(--d3-border-hover);
+  background: var(--d3-surface-2);
+}
+
+.d3-input::placeholder,
+.d3-textarea::placeholder {
+  color: var(--d3-text-muted);
+}
+
+.d3-input:disabled,
+.d3-select:disabled,
+.d3-textarea:disabled {
+  color: var(--d3-text-disabled);
+  background: var(--d3-surface-3);
+  cursor: not-allowed;
+}
+
+.d3-input--sm  { padding: 4px 8px;  font-size: var(--d3-font-size-xs); }
+.d3-input--md  { padding: 6px 10px; font-size: var(--d3-font-size-sm); }
+.d3-input--lg  { padding: 8px 12px; font-size: var(--d3-font-size-md); }
+
+/* ==========================================================================
+   Status Indicator
+   ========================================================================== */
+
+.d3-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--d3-font-size-xs);
+  font-weight: var(--d3-font-weight-medium);
+  color: var(--d3-text-secondary);
+}
+
+.d3-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.d3-status-dot--idle    { background: var(--d3-text-muted); }
+.d3-status-dot--active  { background: var(--d3-success); }
+.d3-status-dot--warning { background: var(--d3-warning); }
+.d3-status-dot--error   { background: var(--d3-danger); }
+
+/* ==========================================================================
+   Chips / Tags
+   ========================================================================== */
+
+.d3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--d3-font-size-xs);
+  font-weight: var(--d3-font-weight-medium);
+  color: var(--d3-text-secondary);
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-pill);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.d3-chip:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+
+.d3-chip--selected {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+
+/* ==========================================================================
+   Color Swatch (for avatar customization)
+   ========================================================================== */
+
+.d3-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--d3-radius-sm);
+  border: 1px solid var(--d3-border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.d3-swatch--selected {
+  border: 2px solid var(--d3-border-hover);
+}
+
+.d3-swatch--circle {
+  border-radius: var(--d3-radius-pill);
+}
+
+/* ==========================================================================
+   Range Slider
+   ========================================================================== */
+
+.d3-range {
+  width: 100%;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.d3-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--d3-text);
+  border: 1px solid var(--d3-border);
+  cursor: pointer;
+}
+
+.d3-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--d3-text);
+  border: 1px solid var(--d3-border);
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Scrollbar
+   ========================================================================== */
+
+.d3-scrollable::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.d3-scrollable::-webkit-scrollbar-track {
+  background: var(--d3-surface-1);
+}
+
+.d3-scrollable::-webkit-scrollbar-thumb {
+  background: var(--d3-border);
+  border-radius: var(--d3-radius-pill);
+}
+
+.d3-scrollable::-webkit-scrollbar-thumb:hover {
+  background: var(--d3-border-hover);
+}
+
+/* ==========================================================================
+   Layout containers
+   ========================================================================== */
+
+.d3-layout {
+  display: grid;
+  grid-template-areas:
+    "topbar topbar"
+    "sidebar viewport"
+    "timeline timeline";
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: auto 1fr auto;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.d3-layout-sidebar {
+  grid-area: sidebar;
+  padding: var(--d3-space-4);
+  overflow-y: auto;
+}
+
+.d3-layout-viewport {
+  grid-area: viewport;
+  position: relative;
+}
+
+.d3-layout-timeline {
+  grid-area: timeline;
+  padding: var(--d3-space-3);
+}
+
+.d3-layout-topbar {
+  grid-area: topbar;
+}
+
+/* ==========================================================================
+   Utility
+   ========================================================================== */
+
+.d3-flex { display: flex; }
+.d3-flex-col { display: flex; flex-direction: column; }
+.d3-flex-between { display: flex; justify-content: space-between; align-items: center; }
+.d3-flex-center { display: flex; justify-content: center; align-items: center; }
+.d3-gap-1 { gap: var(--d3-space-1); }
+.d3-gap-2 { gap: var(--d3-space-2); }
+.d3-gap-3 { gap: var(--d3-space-3); }
+.d3-gap-4 { gap: var(--d3-space-4); }
+
+.d3-overflow-auto { overflow: auto; }
+.d3-overflow-y-auto { overflow-y: auto; }
+.d3-overflow-x-auto { overflow-x: auto; }
+
+.d3-hidden { display: none; }

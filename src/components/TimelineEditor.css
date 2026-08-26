@@ -1,0 +1,139 @@
+/* D3 STUDIO — Timeline Editor component styles
+   Professional dark cinematic aesthetic.
+   Reuses design-system CSS variables. */
+
+.d3-timeline-editor {
+  background: var(--d3-surface-2);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-xl);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.d3-timeline-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.d3-timeline-editor__title {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+  font-weight: var(--d3-font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.d3-timeline-editor__subtitle {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-muted);
+}
+
+.d3-timeline-editor__track {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  min-height: 44px;
+  align-items: flex-end;
+}
+
+.d3-timeline-editor__shot {
+  flex: 0 0 auto;
+  text-align: left;
+  background: var(--d3-surface-1);
+  border: 1px solid var(--d3-border);
+  border-radius: var(--d3-radius-md);
+  padding: 6px 8px;
+  color: var(--d3-text);
+  cursor: pointer;
+  font-size: var(--d3-font-size-xs);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.d3-timeline-editor__shot:hover {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+}
+
+.d3-timeline-editor__shot--active {
+  background: var(--d3-surface-3);
+  border-color: var(--d3-border-hover);
+  color: var(--d3-text);
+}
+
+.d3-timeline-editor__shot-label {
+  font-weight: var(--d3-font-weight-semibold);
+  margin-bottom: 2px;
+}
+
+.d3-timeline-editor__shot-text {
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.d3-timeline-editor__shot-duration {
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+.d3-timeline-editor__empty {
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-muted);
+  padding: 8px;
+}
+
+.d3-timeline-editor__inspector {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 8px;
+  align-items: end;
+  border-top: 1px solid var(--d3-border);
+  padding-top: 8px;
+}
+
+.d3-timeline-editor__inspector-title {
+  grid-column: 1 / -1;
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+  font-weight: var(--d3-font-weight-semibold);
+}
+
+.d3-timeline-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--d3-font-size-xs);
+  color: var(--d3-text-secondary);
+}
+
+.d3-timeline-editor__field--full {
+  grid-column: 1 / -1;
+}
+
+.d3-timeline-editor__actions {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+/* Select / input sizing for timeline inspector */
+.d3-select--sm,
+.d3-input--sm,
+.d3-textarea--sm {
+  padding: 4px 8px;
+  font-size: var(--d3-font-size-xs);
+}
+
+.d3-textarea--sm {
+  min-height: 40px;
+  resize: vertical;
+  font-family: var(--d3-font-family);
+}
