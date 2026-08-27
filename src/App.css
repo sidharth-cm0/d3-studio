@@ -329,6 +329,79 @@
 }
 
 /* ==========================================================================
+   Visual Style Engine — Phase 1
+   Topbar selector + pure-CSS post look (vignette + grain).
+   Both overlay layers are composited GPU surfaces with pointer-events:none,
+   adding ZERO WebGL passes and zero per-frame JS work.
+   ========================================================================== */
+
+.d3-style-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--d3-space-2);
+  margin-right: var(--d3-space-2);
+}
+
+.d3-style-controls__label {
+  font-size: var(--d3-font-size-xs);
+  font-weight: var(--d3-font-weight-medium);
+  color: var(--d3-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.d3-style-controls__select {
+  width: auto;
+  min-width: 108px;
+  height: 24px;
+  padding: 2px 6px;
+  font-size: var(--d3-font-size-xs);
+  cursor: pointer;
+}
+
+/* Viewport overlay root — above canvas, below floating controls (z 10). */
+.d3-style-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+
+/* Subtle cinematic vignette — radial darkening toward frame edges. */
+.d3-style-overlay__vignette {
+  position: absolute;
+  inset: 0;
+  opacity: 0; /* driven inline from the active preset */
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 52%,
+    rgba(0, 0, 0, 0.28) 78%,
+    rgba(0, 0, 0, 0.62) 100%
+  );
+}
+
+/* Subtle film grain — static SVG turbulence tile (no animation loop, no
+   repaint churn; safe for older hardware). Opacity driven by preset. */
+.d3-style-overlay__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0; /* driven inline from the active preset */
+  transition: opacity 0.4s ease;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  mix-blend-mode: overlay;
+}
+
+@media (max-width: 1280px) {
+  .d3-style-controls__label {
+    display: none;
+  }
+}
+
+/* ==========================================================================
    MoCap video monitor
    ========================================================================== */
 

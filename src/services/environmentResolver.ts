@@ -106,6 +106,32 @@ export interface BlueprintPropRequest {
   count: number
 }
 
+/**
+ * Per-category material palette (Phase 2). Pure data — the composers map
+ * these roles onto their prop materials so every category keeps a coherent,
+ * recognizable color identity that VisualStyleController can still grade.
+ */
+export interface PaletteSpec {
+  /** Dominant surface color (walls / foliage masses / building bodies). */
+  primary: number
+  /** Secondary contrast surface (canopy tops / furniture / trim). */
+  secondary: number
+  /** Accent (trunks / rails / signage glow bases). */
+  accent: number
+  /** Ground/floor tone. */
+  ground: number
+  /** Wall/backdrop tone (interiors). */
+  wall: number
+}
+
+/** Declarative light-fixture request (emissive props — NOT scene lights). */
+export interface BlueprintLightRequest {
+  kind: 'hanging' | 'floor_lamp' | 'station' | 'street' | 'studio_bar' | 'screen_glow'
+  count: number
+  /** false → fixture present but dark (abandoned scenes). */
+  lit: boolean
+}
+
 /** Story-aware detail flags extracted from generic keywords. */
 export interface EnvironmentDetails {
   /** "abandoned / derelict / deserted" → fewer lights, darker, scattered props. */
@@ -139,6 +165,20 @@ export interface EnvironmentBlueprint {
    * re-randomized per render.
    */
   seed: number
+  /**
+   * Phase 2 — structured composition spec consumed by environmentStage.ts:
+   * palette roles, emissive prop requests and the safety envelope. The
+   * declarative `props[]` list above stays the source of truth for WHAT to
+   * place; these fields describe HOW the composition is organized.
+   */
+  palette: PaletteSpec
+  lights: BlueprintLightRequest[]
+  /** Depth composition contract: named layers back-to-front. */
+  depthLayers: ('far' | 'mid' | 'near')[]
+  /** Actor-safe rectangle around origin (half extents). Geometry-free zone. */
+  actorSafeZone: { halfX: number; halfZ: number }
+  /** Camera-safe radius around the default shot pivot (0, ~1.55, +2.8). */
+  cameraSafeRadius: number
 }
 
 /** Structured environment description consumed by the Three.js stage builder. */
@@ -497,6 +537,66 @@ function scaleCounts(
 }
 
 // ---------------------------------------------------------------------------
+// Phase 2 — per-category palettes + light-fixture requests
+// (pure data; the composers map these roles onto prop materials)
+// ---------------------------------------------------------------------------
+
+// Phase 2.1 VISIBILITY FIX: the first palette generation used near-black
+// albedos (0x0d–0x14) for warehouse/railway/apartment/broadcast. MeshStandard
+// surfaces that dark reflect almost nothing under the night/midnight grades,
+// so entire environments rendered as black voids (the forest read fine because
+// its palette is 3–4× brighter). These palettes keep each category's hue
+// identity at forest-like luminance so structure reads in EVERY mood grade,
+// including Noir Deco (which multiplies lightness by ~0.62 on top).
+const CATEGORY_PALETTES: Record<ComposableKind, PaletteSpec> = {
+  warehouse: { primary: 0x6a7280, secondary: 0x6b5a41, accent: 0x8b95a3, ground: 0x3a3f47, wall: 0x565e69 },
+  railway: { primary: 0x59616c, secondary: 0x666e7a, accent: 0x9aa3af, ground: 0x3a3e46, wall: 0x525a64 },
+  apartment: { primary: 0xb39c82, secondary: 0x8a6f52, accent: 0xa07d55, ground: 0x6b5a48, wall: 0xb39c82 },
+  broadcast: { primary: 0x2e4470, secondary: 0x24365c, accent: 0x67e8f9, ground: 0x2a3348, wall: 0x1f3054 },
+  office: { primary: 0x2b303c, secondary: 0x23262e, accent: 0x39404d, ground: 0x23262e, wall: 0x2b303c },
+  interior: { primary: 0x2b303c, secondary: 0x39404d, accent: 0x453b33, ground: 0x23262e, wall: 0x2b303c },
+  street: { primary: 0x181b23, secondary: 0x2b2d33, accent: 0x22262c, ground: 0x14151a, wall: 0x181b23 },
+  forest: { primary: 0x27603a, secondary: 0x1d3a24, accent: 0x4a3c2e, ground: 0x21402c, wall: 0x1d3a24 },
+}
+
+/** Mood → coarse "is it dark out" flag for light-fixture decisions. */
+function blueprintNight(mood: EnvironmentMood): boolean {
+  return mood === 'night' || mood === 'midnight' || mood === 'horror'
+}
+
+/**
+ * Declarative emissive-prop requests per category. Abandoned scenes keep the
+ * fixtures but most go dark (`lit:false`) — sparse practicals only.
+ */
+function deriveLightRequests(
+  kind: ComposableKind,
+  details: EnvironmentDetails,
+  night: boolean
+): BlueprintLightRequest[] {
+  const lit = !details.abandoned
+  switch (kind) {
+    case 'warehouse':
+      return [{ kind: 'hanging', count: details.abandoned ? 1 : 2, lit }]
+    case 'railway':
+      return [{ kind: 'station', count: details.abandoned ? 1 : 3, lit }, { kind: 'screen_glow', count: 1, lit: false }]
+    case 'apartment':
+    case 'interior':
+      return [{ kind: 'floor_lamp', count: 1, lit: true }] // warm practical always on — it IS the night look
+    case 'broadcast':
+      return [
+        { kind: 'studio_bar', count: 4, lit: true },
+        { kind: 'screen_glow', count: 1, lit: true },
+      ]
+    case 'office':
+      return [{ kind: 'hanging', count: 2, lit }]
+    case 'street':
+      return [{ kind: 'street', count: details.abandoned ? 1 : 3, lit }]
+    case 'forest':
+      return [] // no artificial light in the woods
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Detection helpers
 // ---------------------------------------------------------------------------
 
@@ -579,6 +679,7 @@ export class ProceduralEnvironmentProvider implements EnvironmentProvider {
     // --- semantic blueprint -------------------------------------------------
     const template = CATEGORY_TEMPLATES[kind as ComposableKind]
     const countScale = details.crowded ? 1.5 : details.empty ? 0.55 : 1
+    const composableKind = kind as ComposableKind
     const blueprint: EnvironmentBlueprint = {
       category: kind,
       mood,
@@ -588,6 +689,20 @@ export class ProceduralEnvironmentProvider implements EnvironmentProvider {
       details,
       // Deterministic layout identity: same scene/location ⇒ same layout.
       seed: hashString(request.seedKey || rawText || kind),
+      // Phase 2 composition spec.
+      palette: CATEGORY_PALETTES[composableKind] ?? {
+        primary: 0x2b303c,
+        secondary: 0x39404d,
+        accent: 0x453b33,
+        ground: 0x16171b,
+        wall: 0x2b303c,
+      },
+      lights: useBaseStage
+        ? []
+        : deriveLightRequests(composableKind, details, blueprintNight(mood)),
+      depthLayers: ['far', 'mid', 'near'],
+      actorSafeZone: { halfX: 2.5, halfZ: 1.5 },
+      cameraSafeRadius: 2.55,
     }
 
     // Per-kind lighting adjustments (kept generic — never tied to one story)
@@ -647,6 +762,13 @@ export class ProceduralEnvironmentProvider implements EnvironmentProvider {
         rimColor = '#5470bd'
       }
     }
+    if (kind === 'railway') {
+      // Outdoor platforms at night need a touch more than the generic night
+      // floor so concrete, rails and the canopy read as a STATION (Phase 2.1).
+      ambient = Math.max(ambient, 0.62)
+      key = Math.max(key, 1.0)
+      fill = Math.max(fill, 0.45)
+    }
     if (kind === 'forest') {
       // Woods read best with tighter atmospheric depth.
       fogNear = Math.min(fogNear, 7)
@@ -656,10 +778,12 @@ export class ProceduralEnvironmentProvider implements EnvironmentProvider {
     if (kind === 'apartment' && (mood === 'night' || mood === 'midnight')) {
       // "…apartment at night" → warm practical-lit dim interior: lamp-glow
       // key/fill/rim instead of cold moonlight, kept dim for the night feel.
+      // Phase 2.1: ambient floor raised 0.5 → 0.6 so the lifted warm palette
+      // reads as a ROOM at night instead of a brown void.
       keyColor = '#ffd9a8'
       fillColor = '#e8b48a'
       rimColor = '#ff9d5c'
-      ambient = Math.min(ambient, 0.5)
+      ambient = Math.min(Math.max(ambient, 0.6), 0.62)
       key = Math.min(key, 0.75)
     }
 

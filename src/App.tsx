@@ -22,9 +22,17 @@ import {
 } from './services/environmentResolver'
 import { disposeObjectDeep, buildEnvironmentGroup } from './services/environmentStage'
 import { runEnvironmentSelfTest, logRuntimeEnvTrace } from './services/environmentSelfTest'
+import { parseSceneGraph } from './services/sceneGraphParser'
+import { matchAssetsSync } from './services/semanticAssetMatcher'
+import { planLayout } from './services/spatialLayoutEngine'
+import { buildDynamicEnvironment } from './services/dynamicEnvironment'
+import type { SceneGraph } from './services/sceneGraphTypes'
 import { CharacterLibraryService } from './services/characterLibrary'
 import { TimelineEditor } from './components/TimelineEditor'
 import { PerformanceRecorder } from './services/performanceRecorder'
+import type { VisualStyle } from './services/visualStyle'
+import { getVisualStylePreset, VISUAL_STYLE_OPTIONS } from './services/visualStyle'
+import { VisualStyleController, SteppedAnimationClock } from './services/visualStyleController'
 import type { D3Performance } from './types/d3'
 import './styles/design-system.css'
 import './App.css'
@@ -59,6 +67,12 @@ export interface StageConfig {
   gridColor: number
   keyColor: string
   rimColor: string
+}
+
+interface DynamicStageOverride {
+  group: THREE.Group
+  sceneGraph: SceneGraph
+  signature: string
 }
 
 /** Public sample VRM used when /avatar.vrm is missing from public/ */
@@ -174,6 +188,13 @@ export default function App() {
   const [isExporting, setIsExporting] = useState<boolean>(false)
   const [showCustomizer, setShowCustomizer] = useState<boolean>(false)
 
+  // --- D3 Visual Style Engine (Phase 1) -------------------------------------
+  // 'default' preserves the pre-style-engine look exactly (identity op).
+  // Motion cadence 'auto' follows the active preset's steppedFps
+  // (Noir Deco ⇒ 24); Native/12/24 explicitly override it.
+  const [visualStyle, setVisualStyle] = useState<VisualStyle>('default')
+  const [motionCadence, setMotionCadence] = useState<'auto' | 12 | 24>('auto')
+
   const [skinColor, setSkinColor] = useState<string>('#6e473b')
   const [hairColor, setHairColor] = useState<string>('#140f0c')
   const [shirtColor, setShirtColor] = useState<string>('#2563eb')
@@ -234,6 +255,18 @@ export default function App() {
   const rimLightRef = useRef<THREE.DirectionalLight | null>(null)
   const ambientLightRef = useRef<THREE.AmbientLight | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  // Visual Style engine handles — created ONCE in the mount effect; the
+  // controller wraps the existing lights (never creates new ones).
+  const visualStyleControllerRef = useRef<VisualStyleController | null>(null)
+  const steppedClockRef = useRef<SteppedAnimationClock>(new SteppedAnimationClock())
+  // Mirrors `visualStyle` for buildStageEnvironment (called from handlers and
+  // the mount-only effect without depending on fresh effect closures).
+  const visualStyleRef = useRef<VisualStyle>('default')
+  // Character time (stepped or native) published for handlers that must
+  // anchor durations to the same clock the render loop consumes.
+  const charTimeRef = useRef<number>(0)
+  // Suppresses the one-time style announcement on initial mount.
+  const styleEffectRanRef = useRef(false)
 
   const activeAnchorRef = useRef<LockAnchor>('stage_center')
   const currentPivot = useRef(new THREE.Vector3(0, 1.35, 0))
@@ -287,12 +320,22 @@ export default function App() {
    * Without an override this reproduces the previous behavior exactly
    * (same geometry, same per-preset key/rim colors).
    */
-  const buildStageEnvironment = (stageKey: string, envOverride?: ResolvedEnvironment) => {
+  const buildStageEnvironment = (
+    stageKey: string,
+    envOverride?: ResolvedEnvironment,
+    dynamicOverride?: DynamicStageOverride,
+    routeReason = 'legacy stage request'
+  ) => {
     const scene = sceneRef.current
     if (!scene) return
     const env =
       envOverride ?? EnvironmentResolverService.resolveForPreset(stageKey as D3StagePresetId)
-    appliedEnvKeyRef.current = env.signature
+    if (import.meta.env.DEV) {
+      console.info(
+        `[D3 ENV ROUTE]\nselected=${dynamicOverride ? 'dynamic' : 'legacy'}\nreason=${routeReason}`
+      )
+    }
+    appliedEnvKeyRef.current = dynamicOverride?.signature ?? env.signature
     const config = STAGE_PRESETS[env.preset] || STAGE_PRESETS.cyberpunk
 
     // Dispose the previous environment FULLY before replacing, so switching
@@ -312,7 +355,7 @@ export default function App() {
     const stageGroup = new THREE.Group()
     stageGroupRef.current = stageGroup
 
-    if (env.useBaseStage) {
+    if (!dynamicOverride && env.useBaseStage) {
       // --- existing base stage geometry (classic look, unchanged) ---
       const floorGeo = new THREE.CylinderGeometry(4.5, 4.8, 0.25, 32)
       const floorMat = new THREE.MeshStandardMaterial({
@@ -345,7 +388,10 @@ export default function App() {
     }
 
     // --- blueprint-driven composed environment (prop library + seeded layout) ---
-    if (!env.useBaseStage) {
+    if (dynamicOverride) {
+      propsGroupRef.current = dynamicOverride.group
+      stageGroup.add(dynamicOverride.group)
+    } else if (!env.useBaseStage) {
       const envGroup = buildEnvironmentGroup(env)
       propsGroupRef.current = envGroup
       stageGroup.add(envGroup)
@@ -357,8 +403,13 @@ export default function App() {
     scene.add(stageGroup)
 
     // --- atmosphere: sky background + depth fog ---
-    scene.background = new THREE.Color(env.skyColor)
-    scene.fog = new THREE.Fog(env.fogColor, env.fogNear, env.fogFar)
+    const atmosphere = dynamicOverride?.sceneGraph.atmosphere
+    const backgroundColor = atmosphere?.backgroundColor ?? env.skyColor
+    const fogColor = atmosphere?.fogColor ?? env.fogColor
+    const fogNear = atmosphere?.fogNear ?? env.fogNear
+    const fogFar = atmosphere?.fogFar ?? env.fogFar
+    scene.background = new THREE.Color(backgroundColor)
+    scene.fog = new THREE.Fog(fogColor, fogNear, fogFar)
 
     // --- lighting mood (existing lights, re-graded by the resolver) ---
     if (keyLightRef.current) {
@@ -375,6 +426,89 @@ export default function App() {
     }
     if (ambientLightRef.current) {
       ambientLightRef.current.intensity = env.ambientIntensity
+    }
+
+    // --- Visual Style layer -------------------------------------------------
+    // Record the resolver's grade (this is what 'default' restores to), then
+    // re-apply the active non-default style on top so the chosen look
+    // survives environment/stage switches. Pure mutation — no new objects.
+    // Phase 1.1: the freshly built stage group is registered as the
+    // environment root so non-default styles can GRADE its materials
+    // (darken/desaturate/tame emissive — never VRM characters). New builds
+    // carry pristine materials, so baseline capture stays exact and every
+    // re-grade derives from those pristine values (no cumulative drift).
+    const styleCtrl = visualStyleControllerRef.current
+    if (styleCtrl) {
+      styleCtrl.recordEnvironmentGrade(
+        {
+          backgroundColor,
+          fogColor,
+          fogNear,
+          fogFar,
+          ambientIntensity: env.ambientIntensity,
+          keyLightIntensity: env.keyLightIntensity,
+          keyLightColor: env.keyLightColor,
+          rimLightIntensity: env.rimLightIntensity,
+          rimLightColor: env.rimLightColor,
+          fillLightIntensity: env.fillLightIntensity,
+          fillLightColor: env.fillLightColor,
+        },
+        [stageGroup]
+      )
+      if (visualStyleRef.current !== 'default') {
+        styleCtrl.applyStyle(getVisualStylePreset(visualStyleRef.current))
+      }
+    }
+  }
+
+  /** Route optimized templates to the existing builder; all other scenes use Phase 3. */
+  const applyEnvironmentRoute = (searchText: string, env: ResolvedEnvironment) => {
+    try {
+      const parsed = parseSceneGraph(searchText)
+      if (parsed.template === null) {
+        const sceneGraph = parsed.sceneGraph
+        const signature = `dynamic:${sceneGraph.seed}:${sceneGraph.environment.type}`
+        if (signature === appliedEnvKeyRef.current) return
+        const assetMatches = matchAssetsSync(
+          sceneGraph.objects,
+          undefined,
+          sceneGraph.environment.type
+        )
+        const layout = planLayout({
+          sceneGraph,
+          objects: sceneGraph.objects,
+          seed: sceneGraph.seed,
+        })
+        const dynamic = buildDynamicEnvironment({
+          sceneGraph,
+          resolvedObjects: layout.objects,
+          assetMatches,
+          seed: sceneGraph.seed,
+          layoutStats: layout.stats,
+        })
+        if (dynamic.group.children.length === 0) {
+          disposeObjectDeep(dynamic.group)
+          throw new Error('Phase 3 returned an empty environment group')
+        }
+        buildStageEnvironment(env.preset, env, {
+          group: dynamic.group,
+          sceneGraph,
+          signature,
+        }, `no optimized template for ${sceneGraph.environment.type}`)
+        return
+      }
+
+      if (env.signature === appliedEnvKeyRef.current) return
+      buildStageEnvironment(
+        env.preset,
+        env,
+        undefined,
+        `optimized template ${parsed.template.kind}`
+      )
+    } catch (error) {
+      console.warn('Phase 3 environment route failed; using legacy environment:', error)
+      if (env.signature === appliedEnvKeyRef.current) return
+      buildStageEnvironment(env.preset, env, undefined, 'Phase 3 failed; legacy fallback')
     }
   }
 
@@ -715,17 +849,18 @@ export default function App() {
    */
   const applySceneEnvironment = (scene: D3Scene, episode: D3Episode) => {
     const location = episode.locations?.find((l) => l.id === scene.locationId)
+    const sceneText = [
+      scene.title,
+      location?.name,
+      location?.description,
+      scene.narrativeGoal,
+      scene.emotionalTone,
+      episode.title,
+    ]
+      .filter(Boolean)
+      .join(' · ')
     const env = EnvironmentResolverService.resolve({
-      searchText: [
-        scene.title,
-        location?.name,
-        location?.description,
-        scene.narrativeGoal,
-        scene.emotionalTone,
-        episode.title,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      searchText: sceneText,
       timeOfDay: scene.timeOfDay,
       emotionalTone: scene.emotionalTone,
       fallbackPreset: (location?.presetStageId ?? currentStage) as D3StagePresetId,
@@ -733,9 +868,8 @@ export default function App() {
       // scenes; different locations ⇒ different layouts.
       seedKey: location?.id ?? scene.id,
     })
-    if (env.signature === appliedEnvKeyRef.current) return // same environment — skip
     if (env.preset !== currentStage) setCurrentStage(env.preset)
-    buildStageEnvironment(env.preset, env)
+    applyEnvironmentRoute(sceneText, env)
   }
 
   /**
@@ -817,7 +951,9 @@ export default function App() {
 
     const state: ActorMotionState = {
       kind,
-      startedAt: performance.now(),
+      // Anchored in CHARACTER time (stepped clock) so root motion holds its
+      // pose on non-sample frames exactly like limb/gesture animation.
+      startedAt: charTimeRef.current,
       duration: Math.max(0.8, duration),
       startPos: pos,
       targetPos,
@@ -984,10 +1120,8 @@ export default function App() {
         // Same prompt ⇒ same generated layout; edit the prompt ⇒ new layout.
         seedKey: storyPrompt,
       })
-      if (env.signature !== appliedEnvKeyRef.current) {
-        if (env.preset !== currentStage) setCurrentStage(env.preset)
-        buildStageEnvironment(env.preset, env)
-      }
+      if (env.preset !== currentStage) setCurrentStage(env.preset)
+      applyEnvironmentRoute(storyPrompt, env)
     }
 
     setCurrentEpisode(episode)
@@ -1399,6 +1533,17 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
     scene.add(rimLight)
     rimLightRef.current = rimLight
 
+    // Visual Style engine wraps the EXISTING lights/renderer/mutable fog —
+    // no additional lights, no post-processing passes, no pixel-ratio change.
+    visualStyleControllerRef.current = new VisualStyleController({
+      scene,
+      renderer,
+      ambientLight,
+      keyLight,
+      fillLight,
+      rimLight,
+    })
+
     buildStageEnvironment('cyberpunk')
 
     // DEV-only: verify every procedural location builds real meshes with sane
@@ -1466,14 +1611,30 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
     const timer = new THREE.Timer()
     const tempEuler = new THREE.Euler()
     const offsetVector = new THREE.Vector3()
+    // Accumulated CHARACTER time (equals wall time in native mode; advances
+    // only on sample frames when a stepped cadence is active).
+    let charTimeAccum = 0
 
     const animate = (time: number) => {
       animationFrameId = requestAnimationFrame(animate)
       timer.update()
       const delta = timer.getDelta()
-      const tSec = time * 0.001
 
       TWEEN.update(time)
+
+      // --- Visual Style: stepped motion sampling -----------------------------
+      // charDelta is the CHARACTER-time delta for THIS rendered frame: equal
+      // to `delta` in native mode, or a quantized step on 12/24 fps sample
+      // frames (0 on held frames). Rendering stays at browser refresh rate.
+      // Camera tweens (TWEEN), timeline scheduling, MediaPipe input and UI
+      // remain on NATIVE time — only the character pose updates below consume
+      // charDelta/charT. Steps sum to real elapsed time, so shot durations,
+      // episode timing and motion SPEED are unchanged (classic 12/24 fps
+      // television-animation cadence, nothing slows down).
+      const charDelta = steppedClockRef.current.advance(delta)
+      charTimeAccum += charDelta
+      const charT = charTimeAccum
+      charTimeRef.current = charT
 
       if (
         (modeRef.current === 'mocap' || isRecordingPerfRef.current) &&
@@ -1566,7 +1727,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
         let gaitAmp1 = 0
         if (m1 && !activeUserPerf1Ref.current) {
           const vrmRoot = actor1VrmRef.current.scene
-          const mt = (performance.now() - m1.startedAt) / 1000
+          const mt = charT - m1.startedAt
           const p = Math.min(mt / m1.duration, 1)
           const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2
           if (m1.kind === 'walk' || m1.kind === 'step_back') {
@@ -1580,7 +1741,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw))
           vrmRoot.rotation.y = m1.startYaw + dyaw * ease
           if (m1.kind === 'walk') {
-            gaitPhase1.current += delta * 7.2
+            gaitPhase1.current += charDelta * 7.2
             gaitAmp1 = Math.min(1, mt * 2.2) * (p > 0.9 ? (1 - p) / 0.1 : 1)
             gaitSwing1 = Math.sin(gaitPhase1.current)
             const s = gaitSwing1 * gaitAmp1
@@ -1595,10 +1756,10 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           }
         }
 
-        // --- idle breathing + subtle posture variation ---
-        const breath1 = Math.sin(tSec * 1.8) * 0.018
-        const swayZ1 = Math.sin(tSec * 0.47) * 0.02
-        const swayY1 = Math.sin(tSec * 0.31 + 1.7) * 0.025
+        // --- idle breathing + subtle posture variation (character time) ---
+        const breath1 = Math.sin(charT * 1.8) * 0.018
+        const swayZ1 = Math.sin(charT * 0.47) * 0.02
+        const swayY1 = Math.sin(charT * 0.31 + 1.7) * 0.025
         if ((modeRef.current === 'mocap' || isRecordingPerfRef.current) && !activeUserPerf1Ref.current) {
           currentHeadQuat.current.slerp(targetHeadQuat.current, 0.2)
           const headNode = actor1VrmRef.current.humanoid?.getNormalizedBoneNode('head')
@@ -1607,15 +1768,15 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           }
         } else if (!activeUserPerf1Ref.current) {
           const speaking1 = speakingActorRef.current === 1
-          const nodX1 = speaking1 ? Math.sin(tSec * 4.2) * 0.038 : Math.sin(tSec * 0.83) * 0.02
-          const idleYaw1 = speaking1 ? 0 : Math.sin(tSec * 0.5) * 0.05
+          const nodX1 = speaking1 ? Math.sin(charT * 4.2) * 0.038 : Math.sin(charT * 0.83) * 0.02
+          const idleYaw1 = speaking1 ? 0 : Math.sin(charT * 0.5) * 0.05
           setBoneEuler(actor1VrmRef.current, 'head', nodX1, idleYaw1, 0, 0.12)
         }
 
         // --- gestures: run their own duration, then blend back to neutral ---
         const e1 = activeEmoteActor1.current
         if (e1) {
-          emoteTimerActor1.current += delta
+          emoteTimerActor1.current += charDelta
           const t = emoteTimerActor1.current
           if (e1 === 'wave') {
             const waveOsc = Math.sin(t * 8.0) * 0.45
@@ -1653,7 +1814,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           setBoneEuler(actor1VrmRef.current, 'leftLowerArm', 0, -0.24, -0.06, 0.1)
         }
 
-        actor1VrmRef.current.update(delta)
+        actor1VrmRef.current.update(charDelta)
       }
 
       if (actor2VrmRef.current) {
@@ -1672,7 +1833,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
         let gaitAmp2 = 0
         if (m2 && !activeUserPerf2Ref.current) {
           const vrmRoot2 = actor2VrmRef.current.scene
-          const mt2 = (performance.now() - m2.startedAt) / 1000
+          const mt2 = charT - m2.startedAt
           const p2 = Math.min(mt2 / m2.duration, 1)
           const ease2 = p2 < 0.5 ? 2 * p2 * p2 : 1 - Math.pow(-2 * p2 + 2, 2) / 2
           if (m2.kind === 'walk' || m2.kind === 'step_back') {
@@ -1686,7 +1847,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           dyaw2 = Math.atan2(Math.sin(dyaw2), Math.cos(dyaw2))
           vrmRoot2.rotation.y = m2.startYaw + dyaw2 * ease2
           if (m2.kind === 'walk') {
-            gaitPhase2.current += delta * 7.2
+            gaitPhase2.current += charDelta * 7.2
             gaitAmp2 = Math.min(1, mt2 * 2.2) * (p2 > 0.9 ? (1 - p2) / 0.1 : 1)
             gaitSwing2 = Math.sin(gaitPhase2.current)
             const s2 = gaitSwing2 * gaitAmp2
@@ -1701,19 +1862,19 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           }
         }
 
-        // --- idle breathing + subtle posture variation ---
-        const breath2 = Math.sin(tSec * 1.8 + 1.2) * 0.018
-        const swayZ2 = Math.sin(tSec * 0.43 + 0.9) * 0.02
-        const swayY2 = Math.sin(tSec * 0.29 + 3.1) * 0.025
+        // --- idle breathing + subtle posture variation (character time) ---
+        const breath2 = Math.sin(charT * 1.8 + 1.2) * 0.018
+        const swayZ2 = Math.sin(charT * 0.43 + 0.9) * 0.02
+        const swayY2 = Math.sin(charT * 0.29 + 3.1) * 0.025
         const speaking2 = speakingActorRef.current === 2
-        const nodX2 = speaking2 ? Math.sin(tSec * 4.2) * 0.038 : Math.sin(tSec * 0.77 + 0.9) * 0.02
-        const idleYaw2 = speaking2 ? 0 : Math.sin(tSec * 0.44 + 2.1) * 0.05
+        const nodX2 = speaking2 ? Math.sin(charT * 4.2) * 0.038 : Math.sin(charT * 0.77 + 0.9) * 0.02
+        const idleYaw2 = speaking2 ? 0 : Math.sin(charT * 0.44 + 2.1) * 0.05
         setBoneEuler(actor2VrmRef.current, 'head', nodX2, idleYaw2, 0, 0.12)
 
         // --- gestures: run their own duration, then blend back to neutral ---
         const e2 = activeEmoteActor2.current
         if (e2) {
-          emoteTimerActor2.current += delta
+          emoteTimerActor2.current += charDelta
           const t2 = emoteTimerActor2.current
           if (e2 === 'wave') {
             const waveOsc2 = Math.sin(t2 * 8.0) * 0.45
@@ -1748,7 +1909,7 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           setBoneEuler(actor2VrmRef.current, 'leftLowerArm', 0, -0.24, -0.06, 0.1)
         }
 
-        actor2VrmRef.current.update(delta)
+        actor2VrmRef.current.update(charDelta)
       }
 
       const liveTarget = getSubjectWorldPosition(activeAnchorRef.current)
@@ -1803,6 +1964,8 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
       }
       if (currentMount.contains(renderer.domElement)) currentMount.removeChild(renderer.domElement)
       renderer.dispose()
+      visualStyleControllerRef.current?.dispose()
+      visualStyleControllerRef.current = null
     }
     // Mount-only lifecycle: renderer, stage, VRM actors, MediaPipe and the RAF
     // loop are created exactly once per page load. Mode changes are observed
@@ -1813,6 +1976,28 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
   useEffect(() => {
     modeRef.current = mode
   }, [mode])
+
+  /**
+   * Visual Style application — mutates the EXISTING scene/lights/fog/renderer
+   * through the controller (no reallocation, no page reload). 'default'
+   * restores the Environment Resolver's grade, preserving the original look
+   * bit-for-bit. Cadence 'auto' follows the preset's steppedFps; 12/24
+   * explicitly override it. Runs AFTER the mount effect, so the controller
+   * always exists here.
+   */
+  useEffect(() => {
+    visualStyleRef.current = visualStyle
+    const preset = getVisualStylePreset(visualStyle)
+    visualStyleControllerRef.current?.applyStyle(preset)
+    steppedClockRef.current.setFps(
+      motionCadence === 'auto' ? preset.steppedFps : motionCadence
+    )
+    if (styleEffectRanRef.current) {
+      setStatus(`🎨 Visual Style: ${preset.label}`)
+    } else {
+      styleEffectRanRef.current = true
+    }
+  }, [visualStyle, motionCadence])
 
   // Bind the already-acquired camera stream when the MoCap <video> mounts.
   // MediaPipe / renderer are NOT re-initialized — only the <video> binding.
@@ -1867,6 +2052,37 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
           </div>
         </div>
         <div className="d3-app__topbar-right">
+          {/* D3 Visual Style Engine — Phase 1 compact selector */}
+          <div className="d3-style-controls">
+            <span className="d3-style-controls__label">VISUAL STYLE</span>
+            <select
+              className="d3-select d3-style-controls__select"
+              value={visualStyle}
+              onChange={(e) => setVisualStyle(e.target.value as VisualStyle)}
+              title="Cinematic look layered on the current environment"
+            >
+              {VISUAL_STYLE_OPTIONS.map((opt) => (
+                <option key={opt.id} value={opt.id}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <div
+              className="d3-segmented"
+              title="Character motion cadence — visual sampling only (timing unchanged)"
+            >
+              {(['auto', 24, 12] as const).map((cad) => (
+                <button
+                  key={String(cad)}
+                  type="button"
+                  className={`d3-segmented-option ${motionCadence === cad ? 'd3-segmented-option--active' : ''}`}
+                  onClick={() => setMotionCadence(cad)}
+                >
+                  {cad === 'auto' ? 'Auto' : `${cad}fps`}
+                </button>
+              ))}
+            </div>
+          </div>
           <Button variant="tertiary" size="sm" onClick={undoEpisodeEdit}>
             Undo
           </Button>
@@ -2203,6 +2419,21 @@ Guest: dialogue..."
       {/* Viewport — the dominant area */}
       <div className="d3-app__viewport">
         <div ref={mountRef} className="d3-viewport__canvas-container" />
+
+        {/* Visual Style post look — pure CSS vignette + grain (composited GPU
+            layers, zero extra WebGL passes). Opacity comes from the active
+            preset; both are fully transparent in Default. Sits ABOVE the
+            canvas but BELOW all floating viewport controls (z-index 5 < 10). */}
+        <div className="d3-style-overlay" aria-hidden="true">
+          <div
+            className="d3-style-overlay__vignette"
+            style={{ opacity: getVisualStylePreset(visualStyle).vignetteStrength }}
+          />
+          <div
+            className="d3-style-overlay__grain"
+            style={{ opacity: getVisualStylePreset(visualStyle).grainStrength }}
+          />
+        </div>
 
         {/* Status bar */}
         <div className="d3-status-bar">
