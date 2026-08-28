@@ -29,6 +29,8 @@ import type {
   SceneGraph,
   SceneLightSpec,
   SceneObjectSpec,
+  SceneRelation,
+  SceneRelationType,
   SceneTimeOfDay,
   TemplateCandidate,
   LightIntent,
@@ -377,6 +379,21 @@ const CONCEPTS: ConceptRule[] = [
     id: 'obj_house',
     keys: /\b(houses?|cottages?|huts?|cabins?|farmhouse)\b/,
     objects: [['house', 'supporting']],
+  },
+  {
+    id: 'obj_sofa',
+    keys: /\b(sofas?|couches?|settee)\b/,
+    objects: [['sofa', 'supporting']],
+  },
+  {
+    id: 'obj_detective',
+    keys: /\b(detectives?|investigator|inspector)\b/,
+    objects: [['detective', 'supporting']],
+  },
+  {
+    id: 'obj_door',
+    keys: /\b(doors?|doorway|entrance|gateway)\b/,
+    objects: [['door', 'supporting']],
   },
 ]
 
@@ -859,6 +876,9 @@ const SEMANTIC_SCALE: Record<string, [number, number, number]> = {
   log_seat: [1.4, 0.4, 0.5],
   table: [1.2, 0.75, 0.7],
   chair: [0.5, 0.9, 0.5],
+  sofa: [2.1, 0.85, 0.9],
+  detective: [0.6, 1.8, 0.6],
+  door: [1.3, 2.3, 0.15],
   counter: [2.6, 1.05, 0.7],
   shelf: [1.6, 1.9, 0.4],
   signage: [1.6, 0.9, 0.15],
@@ -930,13 +950,6 @@ function pickTemplate(lower: string, family: string): TemplateCandidate | null {
 // Object assembly
 // ---------------------------------------------------------------------------
 
-let objectIdCounter = 0
-
-function makeObjectId(prefix: string): string {
-  objectIdCounter = (objectIdCounter + 1) % 100000
-  return `${prefix}_${objectIdCounter}`
-}
-
 /** Primitive fallback per semantic type (compound for recognizable silhouettes). */
 const TYPE_PRIMITIVE: Record<string, SceneObjectSpec['primitiveFallback']> = {
   spaceship_wreck: 'compound',
@@ -956,6 +969,9 @@ const TYPE_PRIMITIVE: Record<string, SceneObjectSpec['primitiveFallback']> = {
   log_seat: 'cylinder',
   table: 'compound',
   chair: 'compound',
+  sofa: 'compound',
+  detective: 'compound',
+  door: 'box',
   counter: 'compound',
   shelf: 'compound',
   signage: 'box',
@@ -1002,6 +1018,15 @@ function buildObjects(
 ): SceneObjectSpec[] {
   const objects: SceneObjectSpec[] = []
   const seen = new Map<string, number>()
+  const semanticIdCounts = new Map<string, number>()
+
+  // IDs are local to the graph so repeated parses of the same story produce
+  // identical, stable entity references regardless of prior parser calls.
+  const makeObjectId = (semanticType: string): string => {
+    const count = (semanticIdCounts.get(semanticType) ?? 0) + 1
+    semanticIdCounts.set(semanticType, count)
+    return `${semanticType}_${count}`
+  }
 
   const push = (
     semanticType: string,
@@ -1110,6 +1135,138 @@ function mulberryLocal(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
   }
+}
+
+// ---------------------------------------------------------------------------
+// Basic relation language (Task 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Relation phrase patterns. Each pattern captures a subject noun, a relation
+ * keyword, and an object noun. The parser preserves these as structured
+ * SceneRelation entries (subject → object) instead of losing the relationship
+ * during XYZ placement.
+ *
+ * Supported forms (deterministic, no hardcoded full prompts):
+ *   "<subject> near <object>"
+ *   "<subject> left of <object>"
+ *   "<subject> right of <object>"
+ *   "<subject> in front of <object>"
+ *   "<subject> behind <object>"
+ *   "<subject> facing <object>"
+ *   "<subject> on top of <object>"
+ *   "<subject> inside <object>"
+ *   "<subject> around <object>"
+ *   "<subject> aligned with <object>"
+ */
+const RELATION_PATTERNS: Array<{ type: SceneRelationType; re: RegExp }> = [
+  { type: 'near', re: /\b(\w+)\s+near\s+(\w+)\b/ },
+  { type: 'far', re: /\b(\w+)\s+far\s+from\s+(\w+)\b/ },
+  { type: 'leftOf', re: /\b(\w+)\s+left\s+of\s+(\w+)\b/ },
+  { type: 'rightOf', re: /\b(\w+)\s+right\s+of\s+(\w+)\b/ },
+  { type: 'inFrontOf', re: /\b(\w+)\s+in\s+front\s+of\s+(\w+)\b/ },
+  { type: 'behind', re: /\b(\w+)\s+behind\s+(\w+)\b/ },
+  { type: 'onTopOf', re: /\b(\w+)\s+on\s+top\s+of\s+(\w+)\b/ },
+  { type: 'inside', re: /\b(\w+)\s+inside\s+(\w+)\b/ },
+  { type: 'around', re: /\b(\w+)\s+around\s+(\w+)\b/ },
+  { type: 'facing', re: /\b(\w+)\s+facing\s+(\w+)\b/ },
+  { type: 'alignedWith', re: /\b(\w+)\s+aligned\s+with\s+(\w+)\b/ },
+]
+
+/** Map a noun to the semantic type the parser uses for that object. */
+const NOUN_TO_SEMANTIC: Record<string, string> = {
+  chair: 'chair',
+  table: 'table',
+  lamp: 'lamp_post',
+  sofa: 'sofa',
+  crate: 'crate',
+  machinery: 'lab_machine',
+  machine: 'lab_machine',
+  detective: 'detective',
+  streetlight: 'lamp_post',
+  box: 'crate',
+  door: 'door',
+  bench: 'bench',
+  desk: 'desk',
+  bed: 'bed',
+  shelf: 'shelf',
+  counter: 'counter',
+  plant: 'plant',
+  tree: 'tree',
+  rock: 'rock',
+  barrel: 'barrel',
+  pipe: 'pipe',
+  console: 'console',
+  screen: 'screen_panel',
+  monitor: 'screen_panel',
+  house: 'house',
+  building: 'building',
+  car: 'vehicle_body',
+  truck: 'vehicle_body',
+  boat: 'boat',
+  spaceship: 'spaceship_wreck',
+  wreck: 'spaceship_wreck',
+  debris: 'debris_field',
+  rubble: 'rubble',
+  crystal: 'crystal',
+  stalagmite: 'stalagmite',
+  pillar: 'stone_column',
+  column: 'stone_column',
+  altar: 'altar',
+  throne: 'throne',
+  torch: 'torch_sconce',
+  banner: 'banner',
+  cabinet: 'cabinet',
+  workbench: 'workbench',
+  board: 'board',
+  sign: 'signage',
+  signage: 'signage',
+  tent: 'tent',
+  campfire: 'campfire',
+  log: 'log_seat',
+  hedge: 'hedge',
+  bush: 'bush',
+  dune: 'dune',
+  crater: 'crater_rim',
+  engine: 'engine_cylinder',
+  vehicle: 'vehicle_body',
+}
+
+/**
+ * Extract structured relations from story text by matching the generated
+ * object list. Each matched noun is resolved to a real entity ID so the
+ * relation references valid entities.
+ */
+function extractRelations(lower: string, objects: SceneObjectSpec[]): SceneRelation[] {
+  const relations: SceneRelation[] = []
+  const seen = new Set<string>()
+
+  // Build a noun → entity-ID lookup from the generated objects. The first
+  // matching object of a semantic type wins (deterministic).
+  const nounToId = new Map<string, string>()
+  for (const obj of objects) {
+    const key = obj.semanticType.toLowerCase()
+    if (!nounToId.has(key)) nounToId.set(key, obj.id)
+  }
+
+  for (const pattern of RELATION_PATTERNS) {
+    const m = pattern.re.exec(lower)
+    if (!m) continue
+    const subjectNoun = m[1].toLowerCase()
+    const objectNoun = m[2].toLowerCase()
+    const subjectType = NOUN_TO_SEMANTIC[subjectNoun]
+    const objectType = NOUN_TO_SEMANTIC[objectNoun]
+    if (!subjectType || !objectType) continue
+    const subjectId = nounToId.get(subjectType)
+    const objectId = nounToId.get(objectType)
+    if (!subjectId || !objectId || subjectId === objectId) continue
+    const key = `${pattern.type}:${subjectId}:${objectId}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    relations.push({ type: pattern.type, subject: subjectId, object: objectId })
+  }
+
+  return relations
 }
 
 // ---------------------------------------------------------------------------
@@ -1280,6 +1437,8 @@ export function parseSceneGraph(
   // Weather dimension: snowstorm whiteout / rain haze / fog bank.
   applyWeatherAtmosphere(atmosphere, dims, timeOfDay)
 
+  const objects = buildObjects(lower, family, details, seed, dims)
+
   const sceneGraph: SceneGraph = {
     version: SCENE_GRAPH_VERSION,
     environment: {
@@ -1299,7 +1458,8 @@ export function parseSceneGraph(
     },
     atmosphere,
     lighting,
-    objects: buildObjects(lower, family, details, seed, dims),
+    objects,
+    relations: extractRelations(lower, objects),
     composition: {
       actorSafeRadius: 1.2,
       cameraSafeRadius: 2.55,

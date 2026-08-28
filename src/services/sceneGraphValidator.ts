@@ -26,6 +26,8 @@ import type {
   SceneGraph,
   SceneImportance,
   SceneObjectSpec,
+  SceneRelation,
+  SceneRelationType,
   SceneTimeOfDay,
   SceneZone,
   SkyType,
@@ -69,6 +71,10 @@ const INTENTS: readonly LightIntent[] = ['sun', 'moon', 'sky', 'practical', 'neo
 const HINTS: readonly IntensityHint[] = ['faint', 'dim', 'moderate', 'strong', 'harsh']
 const DENSITIES: readonly SceneDensity[] = ['sparse', 'medium', 'dense']
 const SKIES: readonly SkyType[] = ['solid', 'gradient', 'procedural', 'hdri']
+const RELATIONS: readonly SceneRelationType[] = [
+  'near', 'far', 'leftOf', 'rightOf', 'inFrontOf', 'behind',
+  'onTopOf', 'inside', 'around', 'facing', 'alignedWith',
+]
 
 // ---------------------------------------------------------------------------
 // Budgets (Section 22.F)
@@ -254,9 +260,21 @@ export function validateSceneGraph(raw: unknown): SceneGraph | null {
   let heroCount = 0
   const uniqueSupporting = new Set<string>()
   let dressingCount = 0
+  const seenIds = new Set<string>()
   for (let i = 0; i < objectsRaw.length; i++) {
     const obj = validateObject(objectsRaw[i], i)
     if (!obj) continue
+    // Unique entity IDs — a duplicate ID is repaired with a suffix so the
+    // scene graph always has stable, referenceable entity IDs.
+    if (seenIds.has(obj.id)) {
+      let n = 1
+      let candidate = `${obj.id}_${n}`
+      while (seenIds.has(candidate)) {
+        n++
+        candidate = `${obj.id}_${n}`
+      }
+      obj.id = candidate
+    }
     // Budget enforcement (Section 22.F).
     if (obj.importance === 'hero') {
       if (heroCount >= SCENE_BUDGETS.heroObjects) continue
@@ -268,9 +286,28 @@ export function validateSceneGraph(raw: unknown): SceneGraph | null {
       if (dressingCount >= SCENE_BUDGETS.dressingInstances) continue
       dressingCount++
     }
+    seenIds.add(obj.id)
     objects.push(obj)
   }
   if (objects.length === 0) return null // unusable graph → local fallback
+
+  // --- relations ------------------------------------------------------------
+  // Lightweight runtime validation: valid enum values, subject/object exist,
+  // no self-relations. Invalid relations are dropped (never crash the graph).
+  const relationsRaw = Array.isArray(g.relations) ? g.relations : []
+  const relations: SceneRelation[] = []
+  for (const rRaw of relationsRaw) {
+    if (!rRaw || typeof rRaw !== 'object') continue
+    const r = rRaw as Record<string, unknown>
+    if (typeof r.type !== 'string' || !RELATIONS.includes(r.type as SceneRelationType)) continue
+    const type = r.type as SceneRelationType
+    const subject = typeof r.subject === 'string' && r.subject ? r.subject.slice(0, 64) : ''
+    const object = typeof r.object === 'string' && r.object ? r.object.slice(0, 64) : ''
+    if (!subject || !object) continue
+    if (subject === object) continue // no self-relations
+    if (!seenIds.has(subject) || !seenIds.has(object)) continue // must reference real entities
+    relations.push({ type, subject, object })
+  }
 
   // --- composition ------------------------------------------------------------
   const compRaw = (g.composition ?? {}) as Record<string, unknown>
@@ -304,6 +341,7 @@ export function validateSceneGraph(raw: unknown): SceneGraph | null {
     atmosphere,
     lighting,
     objects,
+    relations,
     composition,
     details,
     seed: seedNum !== null ? Math.floor(seedNum) >>> 0 : 12345,

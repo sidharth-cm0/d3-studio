@@ -103,6 +103,35 @@ export interface SceneObjectSpec {
   compoundHint?: string
 }
 
+/**
+ * Typed spatial relation between two scene entities.
+ *
+ * A relation references entity IDs (SceneObjectSpec.id). The subject is the
+ * entity being described; the object is the reference entity. Relations are
+ * preserved as structured data so the spatial layout engine can resolve them
+ * geometrically instead of losing the relationship during XYZ placement.
+ */
+export type SceneRelationType =
+  | 'near'
+  | 'far'
+  | 'leftOf'
+  | 'rightOf'
+  | 'inFrontOf'
+  | 'behind'
+  | 'onTopOf'
+  | 'inside'
+  | 'around'
+  | 'facing'
+  | 'alignedWith'
+
+export interface SceneRelation {
+  type: SceneRelationType
+  /** Entity ID of the subject (the entity being described). */
+  subject: string
+  /** Entity ID of the object (the reference entity). */
+  object: string
+}
+
 /** Story-aware detail flags extracted from generic keywords. */
 export interface SceneDetails {
   abandoned: boolean
@@ -147,6 +176,8 @@ export interface SceneGraph {
   }
   lighting: SceneLightSpec[]
   objects: SceneObjectSpec[]
+  /** Typed spatial relations between entities (subject → object). */
+  relations: SceneRelation[]
   composition: {
     actorSafeRadius: number
     cameraSafeRadius: number

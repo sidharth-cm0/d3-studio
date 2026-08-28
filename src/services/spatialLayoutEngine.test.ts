@@ -24,13 +24,16 @@ import {
   ACTOR_SAFETY_RADIUS,
   DEFAULT_ACTOR_ANCHORS,
   MAX_COLLISION_RETRIES,
+  NEAR_DISTANCE,
   planLayout,
+  relationSatisfied,
+  resolveRelations,
   twoShotWideCamera,
   type LayoutInput,
   type ResolvedSceneObject,
 } from './spatialLayoutEngine'
 import { mulberry32 } from './spatialLayoutEngine'
-import type { SceneGraph, SceneImportance, SceneObjectSpec } from './sceneGraphTypes'
+import type { SceneGraph, SceneImportance, SceneObjectSpec, SceneRelation } from './sceneGraphTypes'
 
 // ---------------------------------------------------------------------------
 // Test spec factory
@@ -269,7 +272,96 @@ export function runSpatialLayoutSelfTest(): void {
   pass('architecture behind/side', !arch || arch.occlusionSafe, arch ? `occlusionSafe=${arch.occlusionSafe}` : '')
   console.groupEnd()
 
-  // --- 10. Diagnostic report -----------------------------------------------
+  // --- 10. Relation resolution (Task 4/5) ----------------------------------
+  console.group('  relation resolution (near/leftOf/rightOf/inFrontOf/behind/facing)')
+
+  // Helper: build a resolved object with explicit position/rotation.
+  const mkResolved = (
+    id: string,
+    semanticType: string,
+    position: [number, number, number],
+    rotationY = 0
+  ): ResolvedSceneObject => ({
+    sourceSpecId: id,
+    semanticType,
+    importance: 'supporting',
+    position,
+    rotation: [0, rotationY, 0],
+    scale: [1, 1, 1],
+    zone: 'midground',
+    cameraVisible: true,
+    actorSafe: true,
+    occlusionSafe: true,
+    fallbackPrimitive: 'compound',
+  })
+
+  // --- 10a. leftOf / rightOf ----------------------------------------------
+  const leftRight = [
+    mkResolved('chair', 'chair', [-2.0, 0, -3.0]),
+    mkResolved('table', 'table', [-1.0, 0, -3.0]),
+  ]
+  const leftRel: SceneRelation = { type: 'leftOf', subject: 'chair', object: 'table' }
+  const rightRel: SceneRelation = { type: 'rightOf', subject: 'table', object: 'chair' }
+  pass('leftOf(A,B) ⇒ A.x < B.x', relationSatisfied(leftRel, leftRight).satisfied)
+  pass('rightOf(A,B) ⇒ A.x > B.x', relationSatisfied(rightRel, leftRight).satisfied)
+
+  // --- 10b. inFrontOf / behind (forward axis −z) ---------------------------
+  const frontBack = [
+    mkResolved('box', 'crate', [-1.0, 0, -2.0]),
+    mkResolved('door', 'door', [-1.0, 0, -4.0]),
+  ]
+  const frontRel: SceneRelation = { type: 'inFrontOf', subject: 'box', object: 'door' }
+  const behindRel: SceneRelation = { type: 'behind', subject: 'door', object: 'box' }
+  pass('inFrontOf(A,B) ⇒ A.z > B.z (closer to camera)', relationSatisfied(frontRel, frontBack).satisfied)
+  pass('behind(A,B) ⇒ A.z < B.z (further from camera)', relationSatisfied(behindRel, frontBack).satisfied)
+
+  // --- 10c. near -----------------------------------------------------------
+  const nearObjs = [
+    mkResolved('chair', 'chair', [-1.0, 0, -3.0]),
+    mkResolved('table', 'table', [-1.2, 0, -3.1]),
+  ]
+  const nearRel: SceneRelation = { type: 'near', subject: 'chair', object: 'table' }
+  pass('near(A,B) within threshold', relationSatisfied(nearRel, nearObjs).satisfied, `dist=${Math.hypot(0.2, 0.1).toFixed(2)} ≤ ${NEAR_DISTANCE}`)
+
+  // --- 10d. facing ---------------------------------------------------------
+  // A at (−2,0,−3) facing B at (−1,0,−3): desired yaw = atan2(1, 0) = π/2.
+  const facingObjs = [
+    mkResolved('detective', 'detective', [-2.0, 0, -3.0], Math.PI / 2),
+    mkResolved('streetlight', 'lamp_post', [-1.0, 0, -3.0]),
+  ]
+  const facingRel: SceneRelation = { type: 'facing', subject: 'detective', object: 'streetlight' }
+  const facingRes = relationSatisfied(facingRel, facingObjs)
+  pass('facing(A,B) orientation points toward B', facingRes.satisfied, facingRes.detail)
+
+  // --- 10e. resolveRelations nudges + preserves placement ------------------
+  const nudgeObjects = [
+    mkResolved('chair', 'chair', [3.0, 0, -3.0]),
+    mkResolved('table', 'table', [-1.0, 0, -3.0]),
+  ]
+  const nudgeRel: SceneRelation = { type: 'leftOf', subject: 'chair', object: 'table' }
+  const nudge = resolveRelations(nudgeObjects, [nudgeRel])
+  const nudgeChair = nudge.objects.find((o) => o.sourceSpecId === 'chair')
+  pass('resolveRelations nudges subject left of object', !!nudgeChair && nudgeChair.position[0] < -1.0, nudgeChair ? `x=${nudgeChair.position[0]}` : '')
+  pass('resolveRelations preserves object count', nudge.objects.length === nudgeObjects.length)
+
+  // --- 10f. facing resolution sets yaw toward object -----------------------
+  const facingNudge = [
+    mkResolved('detective', 'detective', [-2.0, 0, -3.0], 0),
+    mkResolved('streetlight', 'lamp_post', [-1.0, 0, -3.0]),
+  ]
+  const facingNudgeRes = resolveRelations(facingNudge, [facingRel])
+  const facingNudgeObj = facingNudgeRes.objects.find((o) => o.sourceSpecId === 'detective')
+  const facingNudgeCheck = facingNudgeObj ? relationSatisfied(facingRel, [facingNudgeObj, facingNudge[1]]).satisfied : false
+  pass('facing resolution orients subject toward object', facingNudgeCheck, facingNudgeObj ? `yaw=${facingNudgeObj.rotation[1]}` : '')
+
+  // --- 10g. non-resolvable relations are ignored ---------------------------
+  const onTopRel: SceneRelation = { type: 'onTopOf', subject: 'chair', object: 'table' }
+  const onTopRes = resolveRelations(nudgeObjects, [onTopRel])
+  pass('onTopOf not resolved (out of scope)', onTopRes.resolutions.length === 0)
+
+  console.groupEnd()
+
+  // --- 11. Diagnostic report -----------------------------------------------
   console.log('[D3 LAYOUT] Determinism check:', r1.objects.length === r2.objects.length && r1.stats.objectCollisionRetries === r2.stats.objectCollisionRetries ? 'PASS' : 'FAIL')
   console.log('[D3 LAYOUT] Self-test complete.')
 }

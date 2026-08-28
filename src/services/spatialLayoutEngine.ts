@@ -28,6 +28,8 @@ import type {
   PrimitiveFallback,
   SceneObjectSpec,
   SceneGraph,
+  SceneRelation,
+  SceneRelationType,
 } from './sceneGraphTypes'
 import type { SceneImportance } from './sceneGraphTypes'
 
@@ -109,6 +111,18 @@ export interface LayoutStats {
 export interface LayoutOutput {
   objects: ResolvedSceneObject[]
   stats: LayoutStats
+}
+
+/**
+ * Result of resolving a single spatial relation against the final layout.
+ * Used to make directional relations geometrically testable.
+ */
+export interface RelationResolution {
+  relation: SceneRelation
+  /** Whether the relation is satisfied by the resolved transforms. */
+  satisfied: boolean
+  /** Human-readable reason (for tests / diagnostics). */
+  detail: string
 }
 
 export interface ZoneRect {
@@ -759,6 +773,168 @@ function placeObject(ctx: LayoutContext, spec: SceneObjectSpec, index: number): 
 }
 
 // ---------------------------------------------------------------------------
+// Relation resolution (Task 4)
+// ---------------------------------------------------------------------------
+
+/** Relations the layout engine can resolve geometrically. */
+const RESOLVABLE_RELATIONS: ReadonlySet<SceneRelationType> = new Set([
+  'near', 'leftOf', 'rightOf', 'inFrontOf', 'behind', 'facing',
+])
+
+/**
+ * Forward-axis convention: the D3 stage extends toward −z (camera at +z,
+ * actors near origin). "Behind" means further from the camera (more −z);
+ * "in front of" means closer to the camera (more +z).
+ */
+export const FORWARD_AXIS = -1 // −z is "forward" into the stage
+
+/** Distance threshold (metres) for a "near" relation to be satisfied. */
+export const NEAR_DISTANCE = 2.2
+
+/**
+ * Test whether a single relation is geometrically satisfied by the resolved
+ * transforms. Directional relations are pure geometry — no collision logic.
+ */
+export function relationSatisfied(
+  relation: SceneRelation,
+  objects: ResolvedSceneObject[]
+): RelationResolution {
+  const subject = objects.find((o) => o.sourceSpecId === relation.subject)
+  const object = objects.find((o) => o.sourceSpecId === relation.object)
+  if (!subject || !object) {
+    return { relation, satisfied: false, detail: 'missing entity' }
+  }
+
+  const sx = subject.position[0]
+  const sz = subject.position[2]
+  const ox = object.position[0]
+  const oz = object.position[2]
+  const dx = sx - ox
+  const dz = sz - oz
+  const dist = Math.hypot(dx, dz)
+
+  switch (relation.type) {
+    case 'near':
+      return { relation, satisfied: dist <= NEAR_DISTANCE, detail: `dist=${round3(dist)}` }
+    case 'leftOf':
+      // leftOf(A, B) ⇒ A.x < B.x
+      return { relation, satisfied: sx < ox, detail: `sx=${round3(sx)} ox=${round3(ox)}` }
+    case 'rightOf':
+      // rightOf(A, B) ⇒ A.x > B.x
+      return { relation, satisfied: sx > ox, detail: `sx=${round3(sx)} ox=${round3(ox)}` }
+    case 'inFrontOf':
+      // inFrontOf(A, B) ⇒ A is closer to the camera than B (A.z > B.z)
+      return { relation, satisfied: sz > oz, detail: `sz=${round3(sz)} oz=${round3(oz)}` }
+    case 'behind':
+      // behind(A, B) ⇒ A is further from the camera than B (A.z < B.z)
+      return { relation, satisfied: sz < oz, detail: `sz=${round3(sz)} oz=${round3(oz)}` }
+    case 'facing': {
+      // facing(A, B) ⇒ A's yaw points toward B (within tolerance).
+      const yaw = subject.rotation[1]
+      const desired = Math.atan2(ox - sx, oz - sz)
+      const diff = Math.abs(Math.atan2(Math.sin(yaw - desired), Math.cos(yaw - desired)))
+      const tol = 0.35 // ~20° tolerance
+      return { relation, satisfied: diff <= tol, detail: `yaw=${round3(yaw)} desired=${round3(desired)} diff=${round3(diff)}` }
+    }
+    default:
+      return { relation, satisfied: false, detail: 'not resolvable' }
+  }
+}
+
+/**
+ * Apply resolvable relations to the resolved layout. Preserves existing
+ * placement behavior — relations only nudge entities that already have a
+ * base placement, and never drop or re-place objects.
+ *
+ * Returns the (possibly adjusted) objects plus per-relation resolution
+ * results for testability.
+ */
+export function resolveRelations(
+  objects: ResolvedSceneObject[],
+  relations: SceneRelation[]
+): { objects: ResolvedSceneObject[]; resolutions: RelationResolution[] } {
+  const resolutions: RelationResolution[] = []
+  const adjusted = objects.map((object) => ({
+    ...object,
+    position: [...object.position] as [number, number, number],
+    rotation: [...object.rotation] as [number, number, number],
+    scale: [...object.scale] as [number, number, number],
+  }))
+  const byId = new Map(adjusted.map((object) => [object.sourceSpecId, object]))
+
+  for (const rel of relations) {
+    if (!RESOLVABLE_RELATIONS.has(rel.type)) continue
+    const subject = byId.get(rel.subject)
+    const object = byId.get(rel.object)
+    if (!subject || !object) continue
+
+    const sx = subject.position[0]
+    const sz = subject.position[2]
+    const ox = object.position[0]
+    const oz = object.position[2]
+
+    switch (rel.type) {
+      case 'near': {
+        // Nudge subject toward object if too far (keep it near, not exact).
+        const dist = Math.hypot(sx - ox, sz - oz)
+        if (dist > NEAR_DISTANCE) {
+          const t = (NEAR_DISTANCE * 0.8) / dist
+          subject.position = [round3(ox + (sx - ox) * t), subject.position[1], round3(oz + (sz - oz) * t)]
+        }
+        break
+      }
+      case 'leftOf': {
+        // leftOf(A, B) ⇒ A.x < B.x — push A left of B by a small margin.
+        if (sx >= ox) {
+          const margin = 0.6
+          subject.position = [round3(ox - margin), subject.position[1], subject.position[2]]
+        }
+        break
+      }
+      case 'rightOf': {
+        // rightOf(A, B) ⇒ A.x > B.x — push A right of B by a small margin.
+        if (sx <= ox) {
+          const margin = 0.6
+          subject.position = [round3(ox + margin), subject.position[1], subject.position[2]]
+        }
+        break
+      }
+      case 'inFrontOf': {
+        // inFrontOf(A, B) ⇒ A closer to camera (A.z > B.z).
+        if (sz <= oz) {
+          const margin = 0.6
+          subject.position = [subject.position[0], subject.position[1], round3(oz + margin)]
+        }
+        break
+      }
+      case 'behind': {
+        // behind(A, B) ⇒ A further from camera (A.z < B.z).
+        if (sz >= oz) {
+          const margin = 0.6
+          subject.position = [subject.position[0], subject.position[1], round3(oz - margin)]
+        }
+        break
+      }
+      case 'facing': {
+        // facing(A, B) ⇒ A's yaw points toward B.
+        const yaw = Math.atan2(ox - sx, oz - sz)
+        subject.rotation = [0, round3(yaw), 0]
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  for (const rel of relations) {
+    if (!RESOLVABLE_RELATIONS.has(rel.type)) continue
+    resolutions.push(relationSatisfied(rel, adjusted))
+  }
+
+  return { objects: adjusted, resolutions }
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -790,13 +966,19 @@ export function planLayout(input: LayoutInput): LayoutOutput {
 
   const objects = sorted.map((spec, i) => placeObject(ctx, spec, i))
 
-  const heroCount = objects.filter((o) => o.importance === 'hero').length
-  const visibleHeroCount = objects.filter((o) => o.importance === 'hero' && o.cameraVisible).length
-  const visibleTotal = objects.filter((o) => o.cameraVisible).length
-  const frustumVisibleRatio = objects.length === 0 ? 1 : visibleTotal / objects.length
+  // Apply resolvable relations (near/leftOf/rightOf/inFrontOf/behind/facing)
+  // after base placement. Preserves existing placement behavior — relations
+  // only nudge entities, never drop or re-place them.
+  const relations = input.sceneGraph?.relations ?? []
+  const resolved = resolveRelations(objects, relations)
+
+  const heroCount = resolved.objects.filter((o) => o.importance === 'hero').length
+  const visibleHeroCount = resolved.objects.filter((o) => o.importance === 'hero' && o.cameraVisible).length
+  const visibleTotal = resolved.objects.filter((o) => o.cameraVisible).length
+  const frustumVisibleRatio = resolved.objects.length === 0 ? 1 : visibleTotal / resolved.objects.length
 
   const stats: LayoutStats = {
-    objectCount: objects.length,
+    objectCount: resolved.objects.length,
     heroCount,
     visibleHeroCount,
     frustumVisibleRatio: round3(frustumVisibleRatio),
@@ -806,7 +988,7 @@ export function planLayout(input: LayoutInput): LayoutOutput {
     placementFallbacks: ctx.placementFallbacks,
   }
 
-  return { objects, stats }
+  return { objects: resolved.objects, stats }
 }
 
 /**
