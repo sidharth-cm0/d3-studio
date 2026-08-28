@@ -282,7 +282,7 @@ const SCALE_REFERENCE: Record<string, [number, number, number]> = {
   generator: [1.4, 1.6, 0.9],
   reactor: [1.6, 2.2, 1.6],
   apparatus: [1.2, 1.4, 0.8],
-  pipe: [0.28, 0.28, 12],
+  pipe: [2.4, 0.3, 0.3],
   beam: [6, 0.5, 0.7],
   girder: [6, 0.5, 0.7],
   // Architecture / infrastructure
@@ -323,6 +323,11 @@ const SCALE_REFERENCE: Record<string, [number, number, number]> = {
   statue: [0.9, 2.4, 0.9],
   sculpture: [0.9, 2.4, 0.9],
   monument: [1.6, 3.5, 1.6],
+  // Phase 3 semantic-dimension hero props
+  boat: [3.2, 1.4, 1.4],
+  house: [3.4, 3.0, 3.0],
+  glow_flora: [0.7, 1.3, 0.7],
+  altar: [1.6, 1.1, 1.0],
   fountain: [2.4, 1.4, 2.4],
   water_feature: [2.4, 1.4, 2.4],
   banner: [0.8, 2.4, 0.06],

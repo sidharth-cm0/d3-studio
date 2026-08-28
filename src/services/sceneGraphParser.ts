@@ -36,6 +36,7 @@ import type {
 } from './sceneGraphTypes'
 import { SCENE_GRAPH_VERSION } from './sceneGraphTypes'
 import { validateSceneGraph } from './sceneGraphValidator'
+import { extractSemanticDimensions, describeDimensions, type SemanticDimensions } from './semanticDimensions'
 
 // ---------------------------------------------------------------------------
 // Deterministic helpers
@@ -64,6 +65,13 @@ interface ConceptRule {
   space?: 'indoor' | 'outdoor' | 'mixed'
   /** Object nouns this concept implies (semanticType:importance). */
   objects?: Array<[string, 'hero' | 'supporting' | 'dressing']>
+  /**
+   * When true, this concept's objects only apply when its family WON
+   * (place furniture — a losing "cave" vote must not stalagmite a factory).
+   * Prop concepts (spaceship, pipes, tables…) stay unscoped and compose
+   * into any family.
+   */
+  objectsScoped?: boolean
   /** Material/ground tags. */
   ground?: string
   /** Palette hue votes (hex strings). */
@@ -160,6 +168,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(shop|store|cafe|café|coffee\s?shop|tea\s?shop|bakery|barbershop|boutique|diner|tavern|canteen)\b/,
     family: 'shop',
     space: 'indoor',
+    objectsScoped: true,
     objects: [
       ['counter', 'hero'],
       ['table', 'supporting'],
@@ -174,6 +183,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(laboratory|lab\b|research\s?facility|experiment|specimen|containment)\b/,
     family: 'laboratory',
     space: 'indoor',
+    objectsScoped: true,
     objects: [
       ['lab_machine', 'hero'],
       ['console', 'supporting'],
@@ -189,6 +199,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(temple|shrine|monastery|cathedral|church|ruins?|ancient\s?city)\b/,
     family: 'temple',
     space: 'mixed',
+    objectsScoped: true,
     objects: [
       ['stone_column', 'hero'],
       ['altar', 'supporting'],
@@ -203,6 +214,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(castle|fortress|keep|palace|throne\s?room|dungeon)\b/,
     family: 'castle',
     space: 'indoor',
+    objectsScoped: true,
     objects: [
       ['throne', 'hero'],
       ['stone_column', 'supporting'],
@@ -219,6 +231,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(hospital|clinic|infirmary|ward|medical)\b/,
     family: 'hospital',
     space: 'indoor',
+    objectsScoped: true,
     objects: [
       ['hospital_bed', 'hero'],
       ['cabinet', 'supporting'],
@@ -233,6 +246,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(school|classroom|university|college|library|lecture\s?hall)\b/,
     family: 'school',
     space: 'indoor',
+    objectsScoped: true,
     objects: [
       ['desk', 'hero'],
       ['chair', 'supporting'],
@@ -247,6 +261,7 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(garden|courtyard|greenhouse|conservatory|rooftop\s?garden)\b/,
     family: 'garden',
     space: 'mixed',
+    objectsScoped: true,
     objects: [
       ['plant', 'supporting'],
       ['bench', 'supporting'],
@@ -262,6 +277,7 @@ const CONCEPTS: ConceptRule[] = [
     family: 'cave',
     space: 'indoor',
     ground: 'rocky_terrain',
+    objectsScoped: true,
     objects: [
       ['rock', 'supporting'],
       ['stalagmite', 'dressing'],
@@ -277,6 +293,7 @@ const CONCEPTS: ConceptRule[] = [
     family: 'camp',
     space: 'outdoor',
     ground: 'forest_floor',
+    objectsScoped: true,
     objects: [
       ['campfire', 'hero'],
       ['tent', 'supporting'],
@@ -351,6 +368,16 @@ const CONCEPTS: ConceptRule[] = [
     keys: /\b(counter|bar\b|barista|reception)\b/,
     objects: [['counter', 'hero']],
   },
+  {
+    id: 'obj_pipe',
+    keys: /\b(pipes?|pipework|plumbing|conduits?)\b/,
+    objects: [['pipe', 'dressing']],
+  },
+  {
+    id: 'obj_house',
+    keys: /\b(houses?|cottages?|huts?|cabins?|farmhouse)\b/,
+    objects: [['house', 'supporting']],
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -398,6 +425,8 @@ interface FamilyDefaults {
   backdrop: 'formations' | 'walls' | 'skyline' | 'trees' | 'dunes' | 'panels'
   /** Default object nouns when the story names none. */
   baseObjects: Array<[string, 'hero' | 'supporting' | 'dressing']>
+  /** Preferred auto-hero semantic type when the story names no focal object. */
+  autoHero?: string
 }
 
 const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
@@ -427,6 +456,7 @@ const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
     ground: 'sand',
     palette: { primary: '#c9a06a', secondary: '#b8895a', accent: '#8a6a44', ground: '#c9a06a' },
     backdrop: 'dunes',
+    autoHero: 'rock_formation',
     baseObjects: [
       ['dune', 'supporting'],
       ['rock', 'dressing'],
@@ -452,11 +482,76 @@ const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
       ['palm_tree', 'supporting'],
     ],
   },
+  /** Dimension family — reusable settlement identity (village + any terrain). */
+  village: {
+    indoorOutdoor: 'outdoor',
+    ground: 'grass',
+    palette: { primary: '#6b5a44', secondary: '#7d6b52', accent: '#c9a06a', ground: '#5a6b4a' },
+    backdrop: 'trees',
+    autoHero: 'house',
+    baseObjects: [
+      ['house', 'supporting'],
+      ['house', 'supporting'],
+      ['house', 'supporting'],
+      ['lamp_post', 'dressing'],
+      ['lamp_post', 'dressing'],
+      ['crate', 'dressing'],
+      ['crate', 'dressing'],
+    ],
+  },
+  /** Dimension family — reusable urban identity (city + any weather/style). */
+  city: {
+    indoorOutdoor: 'outdoor',
+    ground: 'road',
+    palette: { primary: '#2a3040', secondary: '#3a4254', accent: '#8ab4ff', ground: '#23262e' },
+    backdrop: 'skyline',
+    autoHero: 'building',
+    baseObjects: [
+      ['building', 'supporting'],
+      ['building', 'supporting'],
+      ['building', 'supporting'],
+      ['lamp_post', 'supporting'],
+      ['lamp_post', 'supporting'],
+      ['signage', 'dressing'],
+      ['signage', 'dressing'],
+    ],
+  },
+  /** Dimension family — reusable industrial identity (factory + condition). */
+  factory: {
+    indoorOutdoor: 'indoor',
+    ground: 'floor',
+    palette: { primary: '#3a3d42', secondary: '#4a4e55', accent: '#c97b52', ground: '#2a2d33' },
+    backdrop: 'panels',
+    autoHero: 'lab_machine',
+    baseObjects: [
+      ['lab_machine', 'supporting'],
+      ['lab_machine', 'supporting'],
+      ['pipe', 'supporting'],
+      ['pipe', 'supporting'],
+      ['barrel', 'dressing'],
+      ['barrel', 'dressing'],
+      ['crate', 'dressing'],
+      ['crate', 'dressing'],
+    ],
+  },
+  /** Dimension family — reusable decay identity (ruins + any architecture). */
+  ruins: {
+    indoorOutdoor: 'outdoor',
+    ground: 'stone_floor',
+    palette: { primary: '#6b6355', secondary: '#7d7565', accent: '#8a8272', ground: '#5c5548' },
+    backdrop: 'formations',
+    autoHero: 'stone_column',
+    baseObjects: [
+      ['stone_column', 'supporting'],
+      ['rubble', 'dressing'],
+    ],
+  },
   forest: {
     indoorOutdoor: 'outdoor',
     ground: 'forest_floor',
     palette: { primary: '#27603a', secondary: '#1d3a24', accent: '#4a3c2e', ground: '#21402c' },
     backdrop: 'trees',
+    autoHero: 'tree',
     baseObjects: [
       ['tree', 'supporting'],
       ['rock', 'dressing'],
@@ -498,6 +593,7 @@ const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
     ground: 'stone_floor',
     palette: { primary: '#7a7264', secondary: '#8f8676', accent: '#a89a80', ground: '#6b6355' },
     backdrop: 'walls',
+    autoHero: 'stone_column',
     baseObjects: [
       ['stone_column', 'supporting'],
       ['rubble', 'dressing'],
@@ -587,6 +683,19 @@ const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
       ['rock', 'dressing'],
     ],
   },
+  /** Dimension family — cavern identity (architecture=cavern). */
+  cave: {
+    indoorOutdoor: 'indoor',
+    ground: 'rocky_terrain',
+    palette: { primary: '#3a3630', secondary: '#4a453e', accent: '#5c564c', ground: '#2e2b26' },
+    backdrop: 'formations',
+    autoHero: 'rock_formation',
+    baseObjects: [
+      ['rock', 'supporting'],
+      ['stalagmite', 'dressing'],
+      ['crystal', 'dressing'],
+    ],
+  },
   /** Universal fallback — a generic open ground with dressing. */
   generic: {
     indoorOutdoor: 'outdoor',
@@ -601,8 +710,108 @@ const FAMILY_DEFAULTS: Record<string, FamilyDefaults> = {
 }
 
 // ---------------------------------------------------------------------------
-// Time-of-day → lighting intent + atmosphere
+// Semantic dimension composition (reusable, never prompt-specific)
 // ---------------------------------------------------------------------------
+
+/** Architecture dimension → environment family (built-structure identity). */
+const ARCH_DIM_FAMILY: Record<string, string> = {
+  village: 'village',
+  city: 'city',
+  factory: 'factory',
+  shop: 'shop',
+  temple: 'temple',
+  laboratory: 'laboratory',
+  ruins: 'ruins',
+  cavern: 'cave',
+}
+
+/** Natural families strong enough to resist generic decay/enclosure words. */
+const STRONG_NATURAL_FAMILIES = new Set([
+  'mars', 'moon', 'desert', 'forest', 'beach', 'mountains', 'waterside', 'camp', 'garden', 'scifi_wreck',
+])
+
+/**
+ * Apply the architecture dimension to the concept-derived family. Named built
+ * structures (village/city/factory/shop/temple/laboratory) always define the
+ * identity — e.g. "underground factory" becomes factory, not cavern. Generic
+ * decay/enclosure words (ruins/cavern) only win over weak/generic families.
+ */
+function applyArchitectureDimension(family: string, dims: SemanticDimensions): string {
+  if (!dims.architecture) return family
+  const archFamily = ARCH_DIM_FAMILY[dims.architecture]
+  if (!archFamily || archFamily === family) return family
+  const named =
+    dims.architecture === 'village' ||
+    dims.architecture === 'city' ||
+    dims.architecture === 'factory' ||
+    dims.architecture === 'shop' ||
+    dims.architecture === 'temple' ||
+    dims.architecture === 'laboratory'
+  if (named || !STRONG_NATURAL_FAMILIES.has(family)) return archFamily
+  return family
+}
+
+/** Terrain dimension → ground material type. */
+const TERRAIN_DIM_GROUND: Record<string, string> = {
+  snow: 'snow',
+  grass: 'grass',
+  sand: 'sand',
+  rock: 'rocky_terrain',
+  concrete: 'concrete',
+  metal: 'metal_floor',
+  water_edge: 'water_edge',
+}
+
+/** Terrain dimension → surface palette bias (ground must READ as the terrain). */
+const TERRAIN_DIM_PALETTE: Record<string, Partial<{ primary: string; secondary: string; accent: string; ground: string }>> = {
+  snow: { primary: '#8a97ad', secondary: '#a8b4c6', accent: '#c4d2e2', ground: '#dfe8f2' },
+  grass: { ground: '#4a6b3a' },
+  sand: { ground: '#c9a06a' },
+  rock: { ground: '#5a5f6b' },
+  concrete: { ground: '#7d8087' },
+  metal: { ground: '#4a4e55' },
+  water_edge: { ground: '#4a5a54' },
+}
+
+/** Weather dimension → atmosphere bias (fog density, background tint). */
+function applyWeatherAtmosphere(
+  atmosphere: { backgroundColor: string; fogColor: string; fogNear: number; fogFar: number; skyType: 'solid' | 'gradient' | 'procedural' | 'hdri' },
+  dims: SemanticDimensions,
+  timeOfDay: SceneTimeOfDay
+): void {
+  const night = timeOfDay === 'night' || timeOfDay === 'midnight' || timeOfDay === 'evening'
+  if (dims.weather === 'snow') {
+    atmosphere.backgroundColor = night ? '#2a3444' : '#8fa4bd'
+    atmosphere.fogColor = night ? '#3a4658' : '#aebfd4'
+    atmosphere.fogNear = 3.5
+    atmosphere.fogFar = 15
+  } else if (dims.weather === 'fog') {
+    atmosphere.fogNear = 3
+    atmosphere.fogFar = 13
+  } else if (dims.weather === 'rain' || dims.weather === 'storm') {
+    atmosphere.fogNear = Math.min(atmosphere.fogNear, 7)
+    atmosphere.fogFar = Math.min(atmosphere.fogFar, 22)
+    if (dims.weather === 'storm') {
+      atmosphere.backgroundColor = '#141821'
+      atmosphere.fogColor = '#1c2230'
+    }
+  }
+}
+
+/** Hero-prop dimension → semantic object type (reusable focal nouns). */
+const HERO_DIM_TYPE: Record<string, string> = {
+  spaceship: 'spaceship_wreck',
+  boat: 'boat',
+  streetlight: 'lamp_post',
+  machinery: 'lab_machine',
+  pillars: 'stone_column',
+  houses: 'house',
+  crystals: 'crystal',
+  counter: 'counter',
+  altar: 'altar',
+  campfire: 'campfire',
+}
+
 
 interface TimeLight {
   intent: LightIntent
@@ -668,7 +877,12 @@ const SEMANTIC_SCALE: Record<string, [number, number, number]> = {
   banner: [0.8, 2.4, 0.06],
   torch_sconce: [0.3, 0.9, 0.3],
   rubble: [0.6, 0.35, 0.6],
+  pipe: [2.4, 0.3, 0.3],
+  barrel: [0.85, 0.9, 0.85],
   crystal: [0.5, 1.1, 0.5],
+  glow_flora: [0.7, 1.3, 0.7],
+  boat: [3.2, 1.4, 1.4],
+  house: [3.4, 3.0, 3.0],
   stalagmite: [0.7, 1.6, 0.7],
   lamp_post: [0.4, 3.4, 0.4],
   crate: [0.8, 0.8, 0.8],
@@ -698,7 +912,7 @@ const TEMPLATE_RULES: Array<{ keys: RegExp; kind: TemplateCandidate['kind']; wei
  */
 function pickTemplate(lower: string, family: string): TemplateCandidate | null {
   // Exotic families always win over generic urban/nature templates.
-  const exotic = ['mars', 'moon', 'desert', 'mountains', 'beach', 'temple', 'castle', 'cave', 'camp', 'waterside', 'garden', 'laboratory', 'hospital', 'school', 'shop', 'cyberpunk', 'scifi_wreck']
+  const exotic = ['mars', 'moon', 'desert', 'mountains', 'beach', 'temple', 'castle', 'cave', 'camp', 'waterside', 'garden', 'laboratory', 'hospital', 'school', 'shop', 'cyberpunk', 'scifi_wreck', 'village', 'city', 'factory', 'ruins']
   if (exotic.includes(family)) return null
 
   let best: TemplateCandidate | null = null
@@ -761,6 +975,9 @@ const TYPE_PRIMITIVE: Record<string, SceneObjectSpec['primitiveFallback']> = {
   torch_sconce: 'compound',
   rubble: 'compound',
   crystal: 'compound',
+  glow_flora: 'compound',
+  boat: 'compound',
+  house: 'compound',
   stalagmite: 'cone',
   lamp_post: 'compound',
   crate: 'box',
@@ -780,7 +997,8 @@ function buildObjects(
   lower: string,
   family: string,
   details: SceneDetails,
-  seed: number
+  seed: number,
+  dims: SemanticDimensions
 ): SceneObjectSpec[] {
   const objects: SceneObjectSpec[] = []
   const seen = new Map<string, number>()
@@ -790,9 +1008,10 @@ function buildObjects(
     importance: SceneObjectSpec['importance'],
     tags: string[]
   ): void => {
-    const key = semanticType
+    // Cap duplicates PER TYPE+IMPORTANCE: heroes 1, supporting 3, dressing 6.
+    // (A hero house may coexist with 3 supporting houses in a village.)
+    const key = `${semanticType}:${importance}`
     const count = seen.get(key) ?? 0
-    // Cap duplicates: heroes 1, supporting 3, dressing 6.
     const cap = importance === 'hero' ? 1 : importance === 'supporting' ? 3 : 6
     if (count >= cap) return
     seen.set(key, count + 1)
@@ -824,29 +1043,56 @@ function buildObjects(
     })
   }
 
-  // 1) Concept-declared objects (story-specific nouns).
+  // 1) Dimension hero props — named focal objects compose with ANY family.
+  //    Pushed first so the primary hero prop wins the hero slot.
+  dims.heroProps.forEach((hp, i) => {
+    const type = HERO_DIM_TYPE[hp]
+    if (type) push(type, i === 0 ? 'hero' : 'supporting', [`dim_${hp}`])
+  })
+
+  // 2) Concept-declared objects (story-specific nouns). Place-furniture
+  //    concepts (objectsScoped) only apply when their family won — a losing
+  //    "cave" vote must not stalagmite an underground factory. Prop concepts
+  //    (spaceship, pipes, houses…) compose into any family.
   for (const concept of CONCEPTS) {
     if (!concept.keys.test(lower)) continue
+    if (concept.objectsScoped && concept.family !== family) continue
     for (const [type, importance] of concept.objects ?? []) {
       push(type, importance, [concept.id])
     }
   }
 
-  // 2) Family base objects (fill semantic gaps — every family has dressing).
+  // 3) Family base objects (fill semantic gaps — every family has dressing).
   const fam = FAMILY_DEFAULTS[family] ?? FAMILY_DEFAULTS.generic
   for (const [type, importance] of fam.baseObjects) {
     push(type, importance, [family])
   }
 
-  // 3) Abandoned stories add scattered debris.
+  // 4) Condition dimension — decay/industry dressing composes anywhere.
+  if (dims.condition.includes('ruined')) {
+    push('rubble', 'dressing', ['ruined'])
+    push('rubble', 'dressing', ['ruined'])
+  }
+  if (dims.condition.includes('industrial') && family !== 'factory') {
+    push('barrel', 'dressing', ['industrial'])
+    push('pipe', 'dressing', ['industrial'])
+  }
+
+  // 5) Abandoned stories add scattered debris.
   if (details.abandoned) {
     push('rubble', 'dressing', ['abandoned'])
     push('crate', 'dressing', ['abandoned'])
   }
 
-  // 4) Guarantee at least one hero object so the composition has a focus.
+  // 6) Glowing vegetation request — emissive flora dressing.
+  if (dims.glowFlora) {
+    push('glow_flora', 'dressing', ['glow_flora'])
+    push('glow_flora', 'dressing', ['glow_flora'])
+  }
+
+  // 7) Guarantee at least one hero object so the composition has a focus.
   if (!objects.some((o) => o.importance === 'hero')) {
-    const heroType = fam.backdrop === 'formations' ? 'rock_formation' : 'console'
+    const heroType = fam.autoHero ?? (fam.backdrop === 'formations' ? 'rock_formation' : 'console')
     push(heroType, 'hero', ['auto'])
   }
 
@@ -923,7 +1169,12 @@ export function parseSceneGraph(
     }
   }
   trace.push(`concepts=[${activeConcepts.map((c) => c.id).join(',')}]`)
+
+  // Dimension projection — reusable semantic axes composed with the family.
+  const dims = extractSemanticDimensions(lower)
+  family = applyArchitectureDimension(family, dims)
   trace.push(`family=${family}`)
+  trace.push(`dims=${describeDimensions(dims)}`)
 
   // Template decision (hybrid strategy).
   const template = pickTemplate(lower, family)
@@ -933,22 +1184,30 @@ export function parseSceneGraph(
   const fam = FAMILY_DEFAULTS[family] ?? FAMILY_DEFAULTS.generic
   const seed = hashString(seedKey || rawText || family)
 
-  // Palette: family base, overridden by concept votes.
+  // Palette: family base, overridden by concept votes, then terrain surface.
   const palette = { ...fam.palette }
   for (const concept of activeConcepts) {
     if (concept.palette) Object.assign(palette, concept.palette)
   }
-
-  // Ground.
-  let groundType = fam.ground
-  for (const concept of activeConcepts) {
-    if (concept.ground) groundType = concept.ground
+  if (dims.terrain && TERRAIN_DIM_PALETTE[dims.terrain]) {
+    Object.assign(palette, TERRAIN_DIM_PALETTE[dims.terrain])
   }
 
-  // Indoor/outdoor: family default, overridden by explicit concept votes.
+  // Ground. Concept ground votes only apply from concepts belonging to the
+  // winning family (a losing "cave" vote must not turn a factory rocky).
+  let groundType = fam.ground
+  for (const concept of activeConcepts) {
+    if (concept.ground && (!concept.family || concept.family === family)) groundType = concept.ground
+  }
+  // Terrain dimension: explicit surface material (snow/sand/concrete/…).
+  if (dims.terrain && TERRAIN_DIM_GROUND[dims.terrain]) {
+    groundType = TERRAIN_DIM_GROUND[dims.terrain]
+  }
+
+  // Indoor/outdoor: family default, then same-family concept votes.
   let indoorOutdoor: SceneGraph['environment']['indoorOutdoor'] = fam.indoorOutdoor
   for (const concept of activeConcepts) {
-    if (concept.space) indoorOutdoor = concept.space
+    if (concept.space && (!concept.family || concept.family === family)) indoorOutdoor = concept.space
   }
 
   // Lighting: time-of-day base, overridden by concept light votes.
@@ -969,6 +1228,8 @@ export function parseSceneGraph(
     primaryColor = '#8ab4ff'
     fillColor = '#22d3ee'
   }
+  // Style dimension: futuristic/cyberpunk scenes get a neon accent anywhere.
+  const styleNeon = dims.style === 'futuristic' || dims.style === 'cyberpunk'
 
   const lighting: SceneLightSpec[] = [
     {
@@ -990,11 +1251,11 @@ export function parseSceneGraph(
   ]
   // One accent for practicals/neons/fire — represented by emissive props +
   // at most one real light (builder decides).
-  if (family === 'cyberpunk' || family === 'shop' || family === 'castle' || family === 'camp' || family === 'cave' || family === 'laboratory') {
+  if (styleNeon || family === 'cyberpunk' || family === 'shop' || family === 'castle' || family === 'camp' || family === 'cave' || family === 'laboratory') {
     lighting.push({
       id: 'accent',
       role: 'accent',
-      intent: family === 'cyberpunk' ? 'neon' : family === 'castle' || family === 'camp' ? 'fire' : 'practical',
+      intent: styleNeon || family === 'cyberpunk' ? 'neon' : family === 'castle' || family === 'camp' ? 'fire' : 'practical',
       color: palette.accent,
       intensityHint: 'dim',
       castShadows: false,
@@ -1016,6 +1277,8 @@ export function parseSceneGraph(
     atmosphere.fogNear = 7
     atmosphere.fogFar = 24
   }
+  // Weather dimension: snowstorm whiteout / rain haze / fog bank.
+  applyWeatherAtmosphere(atmosphere, dims, timeOfDay)
 
   const sceneGraph: SceneGraph = {
     version: SCENE_GRAPH_VERSION,
@@ -1036,7 +1299,7 @@ export function parseSceneGraph(
     },
     atmosphere,
     lighting,
-    objects: buildObjects(lower, family, details, seed),
+    objects: buildObjects(lower, family, details, seed, dims),
     composition: {
       actorSafeRadius: 1.2,
       cameraSafeRadius: 2.55,

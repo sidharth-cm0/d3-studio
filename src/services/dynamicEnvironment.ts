@@ -91,8 +91,10 @@ import {
   registerOccluder,
 } from './environmentProps'
 import {
+  buildAltar,
   buildArtifact,
   buildBed,
+  buildBoat,
   buildBuildingBlock,
   buildCampfire,
   buildConsole,
@@ -102,6 +104,8 @@ import {
   buildDebris,
   buildDune,
   buildGenericCompound,
+  buildGlowFlora,
+  buildHouse,
   buildLabMachine,
   buildMonitor,
   buildPottedPlant,
@@ -296,17 +300,21 @@ function resolveGroundPlan(sg: SceneGraph): GroundPlan {
   if (gt === 'road' || gt === 'street' || gt === 'asphalt' || env === 'street' || env === 'vehicle_scene') {
     return { profile: 'asphalt', interiorStyle: 'plain', colorHex: mixHex(colorHex, 0x0c0d12, 0.55), relief: 0 }
   }
+  // Concrete plaza / urban pavement — flat slab with expansion joints.
+  if (gt === 'concrete' || gt === 'pavement') {
+    return { profile: 'asphalt', interiorStyle: 'plain', colorHex: mixHex(colorHex, 0x8a8d94, 0.35), relief: 0 }
+  }
   if (gt === 'stone_floor') {
     return { profile: 'interior', interiorStyle: 'tile', colorHex, relief: 0 }
   }
-  if (gt === 'floor') {
+  if (gt === 'floor' || gt === 'metal_floor') {
     const style: InteriorStyle =
       env === 'apartment' ? 'wood'
       : env === 'shop' || env === 'cyberpunk' ? 'tile'
       : 'industrial'
     return { profile: 'interior', interiorStyle: style, colorHex, relief: 0 }
   }
-  // Outdoor terrain families (rocky_red_terrain, rocky_terrain, sand,
+  // Outdoor terrain families (rocky_red_terrain, rocky_terrain, sand, snow,
   // forest_floor, grass, water_edge, unknown).
   return { profile: 'terrain', interiorStyle: 'plain', colorHex, relief }
 }
@@ -449,9 +457,9 @@ function resolveBackdropKind(sg: SceneGraph): BackdropKind {
   // A cave is semantically indoor, but its enclosure must be generated as a
   // rocky cavern shell rather than falling through to generic room walls.
   if (env === 'cave') return 'cavern'
-  if (indoor || env === 'shop' || env === 'cyberpunk' || env === 'laboratory' || env === 'hospital' || env === 'school' || env === 'office' || env === 'castle' || env === 'apartment') return 'walls'
+  if (indoor || env === 'shop' || env === 'cyberpunk' || env === 'laboratory' || env === 'hospital' || env === 'school' || env === 'office' || env === 'castle' || env === 'apartment' || env === 'factory') return 'walls'
   if (env === 'desert') return 'dunes'
-  if (env === 'forest' || env === 'camp' || env === 'garden' || env === 'waterside' || env === 'beach') return 'trees'
+  if (env === 'forest' || env === 'camp' || env === 'garden' || env === 'waterside' || env === 'beach' || env === 'village') return 'trees'
   if (env === 'street' || env === 'vehicle_scene' || env === 'city') return 'skyline'
   return 'formations'
 }
@@ -766,6 +774,12 @@ const INSTANCED_FAMILIES: Record<string, InstancedFamilySpec> = {
     mat: (c) => c.mats.get(0x0a2030, { rough: 0.3, emissive: c.palette.accent, emissiveIntensity: 0.95 }),
     jitter: 0.22,
   },
+  glow_flora: {
+    natural: [0.7, 1.3, 0.7],
+    geo: (c) => c.geos.ico(0.16, 0),
+    mat: (c) => c.mats.get(0x0a2030, { rough: 0.35, emissive: c.palette.accent, emissiveIntensity: 1.05 }),
+    jitter: 0.25,
+  },
   stalagmite: {
     natural: [0.65, 1.5, 0.65],
     geo: (c) => c.geos.cone(0.3, 1.3, 6),
@@ -809,7 +823,7 @@ const GROUND_DRESSING_TYPES = new Set([
   'rock', 'boulder', 'crate', 'barrel', 'pallet', 'debris', 'debris_field',
   'rubble', 'bush', 'shrub', 'stump', 'log', 'log_seat', 'crystal',
   'crater', 'crater_rim', 'dune', 'sand_dune', 'stalagmite', 'plant',
-  'wreckage', 'scattered', 'debris_ground',
+  'wreckage', 'scattered', 'debris_ground', 'glow_flora',
 ])
 
 // ---------------------------------------------------------------------------
@@ -868,6 +882,20 @@ function dispatchProp(
   if (has('vehicle', 'car', 'truck', 'vehicle_body', 'caravan')) return { group: buildVehicle(ctx), ref: [2.0, 1.5, 4.4] }
   if (has('stairs', 'steps', 'staircase')) return { group: buildStairs(ctx), ref: [1.6, 1.2, 1.4] }
   if (has('plant', 'foliage', 'greenery')) return { group: buildPottedPlant(ctx), ref: [0.5, 1.0, 0.5] }
+  if (has('boat', 'rowboat', 'canoe', 'sailboat', 'fishing_boat', 'vessel')) {
+    const wreck = ctx.details.abandoned || has('dim_boat')
+    return { group: buildBoat(ctx, woodHex, { wreck }), ref: [3.2, 1.4, 1.4] }
+  }
+  if (has('house', 'cottage', 'hut', 'cabin', 'farmhouse', 'home')) {
+    const ruined = ctx.details.abandoned || ctx.details.old || tags.some((x) => x.includes('ruin'))
+    return { group: buildHouse(ctx, mixHex(ctx.palette.primary, 0xffffff, 0.06), { ruined, lit }), ref: [3.4, 3.0, 3.0] }
+  }
+  if (has('glow_flora', 'glowing_plant', 'bioluminescent', 'luminous_flora')) {
+    return { group: buildGlowFlora(ctx, glowHex), ref: [0.7, 1.3, 0.7], practicalKind: 'crystal' }
+  }
+  if (has('altar', 'dais', 'sacrificial_stone')) {
+    return { group: buildAltar(ctx, mixHex(ctx.palette.primary, 0xffffff, 0.1), 0xffb36b), ref: [1.6, 1.1, 1.0], practicalKind: 'torch' }
+  }
 
   // --- Phase 2 prop library reuse -------------------------------------------
   if (has('table')) {
@@ -1022,7 +1050,7 @@ function dispatchProp(
     recordProp(ctx, 'torch_sconce')
     return { group: g, ref: [0.3, 0.9, 0.3], practicalKind: 'torch' }
   }
-  if (has('fountain', 'water_feature', 'altar', 'throne')) {
+  if (has('fountain', 'water_feature', 'throne')) {
     return { group: buildGenericCompound(ctx, mixHex(ctx.palette.primary, 0xffffff, 0.08)), ref: [1.2, 1.2, 1.2] }
   }
 
@@ -1158,8 +1186,14 @@ function buildGroundScatter(ctx: Ctx, sg: SceneGraph): void {
   } else if (env === 'cave') {
     scatter(ctx.geos.cone(0.16, 0.6, 5), ctx.mats.get(0x0a2030, { rough: 0.3, emissive: ctx.palette.accent, emissiveIntensity: 0.9 }), 5, 0.22, 'scatter_crystal')
     scatter(ctx.geos.dodeca(0.16), scatterMat, 6, 0.22, 'scatter_pebble')
-  } else if (env === 'warehouse' || env === 'street' || env === 'vehicle_scene') {
+  } else if (env === 'warehouse' || env === 'street' || env === 'vehicle_scene' || env === 'city') {
     scatter(ctx.geos.box(0.7, 0.7, 0.7), ctx.mats.get(0x6b5638, { rough: 0.9 }), 4, 0.4, 'scatter_crate')
+  } else if (env === 'village') {
+    scatter(ctx.geos.box(0.6, 0.6, 0.6), ctx.mats.get(0x6b5638, { rough: 0.9 }), 3, 0.35, 'scatter_crate')
+    scatter(ctx.geos.ico(0.3, 0), ctx.mats.get(ctx.night ? 0x12231a : 0x1e5332, { rough: 1 }), 5, 0.3, 'scatter_bush')
+  } else if (env === 'factory' || env === 'laboratory') {
+    scatter(ctx.geos.cyl(0.42, 0.42, 0.9, 10), ctx.mats.get(0x26303a, { rough: 0.5, metal: 0.6 }), 4, 0.4, 'scatter_barrel')
+    scatter(ctx.geos.box(0.5, 0.26, 0.5), ctx.mats.get(0x2a2620, { rough: 0.95 }), 4, 0.3, 'scatter_debris')
   } else if (ctx.count < 40) {
     // Interiors / generic: a couple of low dressing props for near-depth.
     scatter(ctx.geos.dodeca(0.14), scatterMat, 5, 0.2, 'scatter_pebble')

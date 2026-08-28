@@ -315,6 +315,110 @@ export function runDynamicEnvironmentSelfTest(): void {
   }
   console.groupEnd()
 
+  // --- G. UNSEEN 1 — frozen village snowstorm (semantic composition) ----------
+  console.group('  G. Unseen: frozen village snowstorm')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('Two explorers walk through a frozen village during a snowstorm.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('village identity (family=village)', scene.sceneGraph.environment.type === 'village', `env=${scene.sceneGraph.environment.type}`)
+    pass('snow terrain ground', scene.sceneGraph.ground.type === 'snow', `ground=${scene.sceneGraph.ground.type}`)
+    pass('snow-white ground material', (() => {
+      const g = findGround(scene.group) as import('three').Mesh | null
+      if (!g) return false
+      const c = (g.material as import('three').MeshStandardMaterial).color
+      return c.r > 0.6 && c.g > 0.65 && c.b > 0.7
+    })())
+    pass('house structures present', (census['house'] ?? 0) + (census['house_ruined'] ?? 0) >= 1, `houses=${(census['house'] ?? 0) + (census['house_ruined'] ?? 0)}`)
+    pass('village backdrop (trees)', scene.group.userData.backdropKind === 'trees', `backdrop=${String(scene.group.userData.backdropKind)}`)
+    pass('snowstorm atmosphere (dense fog)', scene.sceneGraph.atmosphere.fogNear <= 5, `fogNear=${scene.sceneGraph.atmosphere.fogNear}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Unseen: frozen village', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
+  // --- H. UNSEEN 2 — rainy futuristic city -------------------------------------
+  console.group('  H. Unseen: rainy futuristic city')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('A detective waits beside a streetlight in a rainy futuristic city.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('city identity (family=city)', scene.sceneGraph.environment.type === 'city', `env=${scene.sceneGraph.environment.type}`)
+    pass('street/asphalt ground', scene.sceneGraph.ground.type === 'road', `ground=${scene.sceneGraph.ground.type}`)
+    pass('city skyline backdrop', scene.group.userData.backdropKind === 'skyline', `backdrop=${String(scene.group.userData.backdropKind)}`)
+    pass('buildings present', (census['building'] ?? 0) >= 1, `buildings=${census['building'] ?? 0}`)
+    pass('streetlight present', (census['lamp_post'] ?? 0) >= 1, `lamp_posts=${census['lamp_post'] ?? 0}`)
+    pass('rain atmosphere (haze)', scene.sceneGraph.atmosphere.fogFar <= 24, `fogFar=${scene.sceneGraph.atmosphere.fogFar}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Unseen: rainy city', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
+  // --- I. UNSEEN 3 — tropical beach boat at sunset ------------------------------
+  console.group('  I. Unseen: tropical beach boat sunset')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('A woman discovers an abandoned boat on a tropical beach at sunset.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('beach identity (family=beach)', scene.sceneGraph.environment.type === 'beach', `env=${scene.sceneGraph.environment.type}`)
+    pass('sand ground', scene.sceneGraph.ground.type === 'sand', `ground=${scene.sceneGraph.ground.type}`)
+    pass('boat hero prop exists', (census['boat'] ?? 0) + (census['boat_wreck'] ?? 0) >= 1, `boats=${(census['boat'] ?? 0) + (census['boat_wreck'] ?? 0)}`)
+    pass('palm trees present', (census['palm_tree'] ?? 0) + (census['tree'] ?? 0) >= 1, `palms=${(census['palm_tree'] ?? 0) + (census['tree'] ?? 0)}`)
+    pass('sunset time detected', scene.sceneGraph.timeOfDay === 'sunset', `time=${scene.sceneGraph.timeOfDay}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Unseen: beach boat', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
+  // --- J. UNSEEN 4 — abandoned underground factory ------------------------------
+  console.group('  J. Unseen: abandoned underground factory')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('Two engineers investigate an abandoned underground factory filled with pipes and machinery.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('factory identity (NOT cavern)', scene.sceneGraph.environment.type === 'factory', `env=${scene.sceneGraph.environment.type}`)
+    pass('industrial floor', (census['ground_industrial'] ?? 0) + (census['ground_tile'] ?? 0) >= 1, `floor=${(census['ground_industrial'] ?? 0) + (census['ground_tile'] ?? 0)}`)
+    pass('machinery present', (census['lab_machine'] ?? 0) >= 1, `machines=${census['lab_machine'] ?? 0}`)
+    pass('pipes present', (census['pipe'] ?? 0) >= 1, `pipes=${census['pipe'] ?? 0}`)
+    pass('industrial dressing (barrels/crates)', (census['barrel'] ?? 0) + (census['crate'] ?? 0) >= 1, `dressing=${(census['barrel'] ?? 0) + (census['crate'] ?? 0)}`)
+    pass('interior architecture (walls)', scene.group.userData.backdropKind === 'walls', `backdrop=${String(scene.group.userData.backdropKind)}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Unseen: factory', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
+  // --- K. UNSEEN 5 — ancient ruined temple with glowing plants ------------------
+  console.group('  K. Unseen: ancient ruined temple glowing plants')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('A warrior enters an ancient ruined temple surrounded by giant stone pillars and glowing plants.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('temple identity (family=temple)', scene.sceneGraph.environment.type === 'temple', `env=${scene.sceneGraph.environment.type}`)
+    pass('stone floor ground', scene.sceneGraph.ground.type === 'stone_floor', `ground=${scene.sceneGraph.ground.type}`)
+    pass('stone pillars present', (census['pillar'] ?? 0) + (census['stone_column'] ?? 0) >= 1, `pillars=${(census['pillar'] ?? 0) + (census['stone_column'] ?? 0)}`)
+    pass('altar present', (census['altar'] ?? 0) >= 1, `altars=${census['altar'] ?? 0}`)
+    pass('rubble (ruined condition)', (census['rubble'] ?? 0) + (census['fam_rubble'] ?? 0) >= 1, `rubble=${(census['rubble'] ?? 0) + (census['fam_rubble'] ?? 0)}`)
+    pass('glowing flora present', (census['glow_flora'] ?? 0) + (census['fam_glow_flora'] ?? 0) >= 1, `flora=${(census['glow_flora'] ?? 0) + (census['fam_glow_flora'] ?? 0)}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Unseen: temple', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
+  // --- L. Forest regression (Phase 3 baseline) ----------------------------------
+  console.group('  L. Forest regression')
+  {
+    const failuresBefore = failureCount
+    const scene = buildScene('A ranger patrols the deep forest at dawn.')
+    const census = (scene.group.userData.census ?? {}) as Record<string, number>
+    pass('forest identity (family=forest)', scene.sceneGraph.environment.type === 'forest', `env=${scene.sceneGraph.environment.type}`)
+    pass('forest floor ground', scene.sceneGraph.ground.type === 'forest_floor', `ground=${scene.sceneGraph.ground.type}`)
+    pass('trees present', (census['tree'] ?? 0) >= 1, `trees=${census['tree'] ?? 0}`)
+    pass('forest backdrop (trees)', scene.group.userData.backdropKind === 'trees', `backdrop=${String(scene.group.userData.backdropKind)}`)
+    assertQuality(scene, { drawRange: [8, 70], heroExpected: true })
+    results.push({ name: 'Forest regression', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
   // --- F. Empty-graph guarantee (never an empty group) -------------------------
   console.group('  F. Degenerate input (zero objects)')
   {

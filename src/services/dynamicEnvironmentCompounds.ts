@@ -568,6 +568,186 @@ export function buildFloorLamp(ctx: Ctx, lit = true, glowHex = 0xffd9a0): THREE.
   return g
 }
 
+/**
+ * Boat / rowboat — hull + keel + bench seats + optional mast.
+ * Wreck variant: broken hull, tilted, half-sunk plates.
+ * Reference: 3.2 w × 1.4 h × 1.4 d.
+ */
+export function buildBoat(ctx: Ctx, hex = 0x5c4531, opts: { wreck?: boolean } = {}): THREE.Group {
+  const g = newProp('boat')
+  const hullHex = opts.wreck ? mixHex(hex, 0x000000, 0.35) : hex
+  const hull = ctx.mats.get(hullHex, { rough: 0.85 })
+  const dark = ctx.mats.get(mixHex(hullHex, 0x000000, 0.3), { rough: 0.9 })
+  const len = 3.2
+  // Hull: two tapered sides + bow/stern caps + flat keel.
+  for (const side of [-1, 1]) {
+    const wall = mkMesh(ctx, ctx.geos.box(len, 0.5, 0.09), hull, 0, 0.42, side * 0.42)
+    wall.rotation.x = side * 0.22
+    wall.updateMatrix()
+    g.add(wall)
+  }
+  g.add(mkMesh(ctx, ctx.geos.box(len, 0.1, 0.9), dark, 0, 0.12, 0))
+  // Bow (tapered, points −z) + stern cap.
+  const bow = mkMesh(ctx, ctx.geos.cone(0.48, 0.9, 4), hull, 0, 0.42, -len / 2 - 0.2)
+  bow.rotation.x = -Math.PI / 2
+  bow.rotation.y = Math.PI / 4
+  bow.updateMatrix()
+  g.add(bow)
+  g.add(mkMesh(ctx, ctx.geos.box(0.12, 0.5, 0.9), hull, len / 2, 0.42, 0))
+  // Bench seats.
+  for (const bx2 of [-0.8, 0.1, 1.0]) {
+    g.add(mkMesh(ctx, ctx.geos.box(0.28, 0.07, 0.8), dark, bx2, 0.62, 0))
+  }
+  if (opts.wreck) {
+    // Broken gunwale + spilled plank.
+    const broken = mkMesh(ctx, ctx.geos.box(0.7, 0.4, 0.09), dark, 0.9, 0.3, -0.5)
+    broken.rotation.z = 0.5
+    broken.updateMatrix()
+    g.add(broken)
+    const plank = mkMesh(ctx, ctx.geos.box(0.9, 0.06, 0.2), dark, -0.6, 0.05, 0.9)
+    plank.rotation.y = ctx.rng() * Math.PI
+    plank.updateMatrix()
+    g.add(plank)
+  } else {
+    // Simple mast + boom.
+    g.add(mkMesh(ctx, ctx.geos.cyl(0.05, 0.07, 2.2, 6), dark, -0.3, 1.6, 0))
+    const boom = mkMesh(ctx, ctx.geos.cyl(0.03, 0.03, 1.2, 5), dark, -0.3, 2.4, 0)
+    boom.rotation.z = Math.PI / 2
+    boom.updateMatrix()
+    g.add(boom)
+  }
+  recordProp(ctx, opts.wreck ? 'boat_wreck' : 'boat')
+  return g
+}
+
+/**
+ * House / village hut — walls + gable roof + door + window + chimney.
+ * Ruined variant: collapsed roof panel, broken wall, no chimney.
+ * Reference: 3.4 w × 3.0 h × 3.0 d.
+ */
+export function buildHouse(ctx: Ctx, hex = 0x6b5a44, opts: { ruined?: boolean; lit?: boolean } = {}): THREE.Group {
+  const g = newProp('house')
+  const wall = ctx.mats.get(jitterHex(hex, ctx.rng, 0.14), { rough: 0.92 })
+  const roofHex = mixHex(hex, 0x2a1e14, 0.45)
+  const roof = ctx.mats.get(roofHex, { rough: 0.9 })
+  const dark = ctx.mats.get(mixHex(hex, 0x000000, 0.5), { rough: 0.92 })
+  const lit = opts.lit !== false && !opts.ruined
+  const win = ctx.mats.get(0x0a0e18, {
+    rough: 0.4,
+    emissive: lit ? 0xe8c47a : 0x0a0e18,
+    emissiveIntensity: lit ? 0.85 : 0.05,
+  })
+  const w = 3.4
+  const h = 2.1
+  const d = 3.0
+  // Four walls (front face toward +z / camera).
+  g.add(mkMesh(ctx, ctx.geos.box(w, h, 0.16), wall, 0, h / 2, d / 2))
+  g.add(mkMesh(ctx, ctx.geos.box(w, h, 0.16), wall, 0, h / 2, -d / 2))
+  g.add(mkMesh(ctx, ctx.geos.box(0.16, h, d), wall, -w / 2, h / 2, 0))
+  g.add(mkMesh(ctx, ctx.geos.box(0.16, h, d), wall, w / 2, h / 2, 0))
+  // Gable roof: two slabs meeting at a ridge along X.
+  const roofLen = w + 0.5
+  for (const side of [-1, 1]) {
+    const slab = mkMesh(ctx, ctx.geos.box(roofLen, 0.12, d * 0.72), roof, 0, h + 0.62, side * d * 0.27)
+    slab.rotation.x = side * 0.62
+    slab.updateMatrix()
+    g.add(slab)
+  }
+  // Door + window on the front face.
+  g.add(mkMesh(ctx, ctx.geos.box(0.62, 1.25, 0.08), dark, -0.8, 0.62, d / 2 + 0.05))
+  g.add(mkMesh(ctx, ctx.geos.box(0.7, 0.6, 0.06), win, 0.8, 1.25, d / 2 + 0.05))
+  if (opts.ruined) {
+    // Collapsed roof corner + rubble spill + broken wall notch.
+    const fallen = mkMesh(ctx, ctx.geos.box(1.6, 0.12, 1.4), roof, 1.4, 0.1, d / 2 + 0.9)
+    fallen.rotation.z = 0.28
+    fallen.rotation.y = ctx.rng() * 0.6
+    fallen.updateMatrix()
+    g.add(fallen)
+    for (let i = 0; i < 4; i++) {
+      const chunk = mkMesh(
+        ctx,
+        ctx.geos.dodeca(0.14 + ctx.rng() * 0.12),
+        wall,
+        (ctx.rng() - 0.5) * 2.4,
+        0.1,
+        d / 2 + 0.4 + ctx.rng() * 0.9
+      )
+      chunk.rotation.y = ctx.rng() * Math.PI
+      chunk.updateMatrix()
+      g.add(chunk)
+    }
+  } else {
+    // Chimney + smoke cap.
+    g.add(mkMesh(ctx, ctx.geos.box(0.34, 0.9, 0.34), ctx.mats.get(mixHex(hex, 0x000000, 0.4), { rough: 0.95 }), 1.1, h + 0.95, -0.5))
+  }
+  recordProp(ctx, opts.ruined ? 'house_ruined' : 'house')
+  return g
+}
+
+/**
+ * Glowing flora cluster — emissive fronds/spores on dark stalks.
+ * Used when a story requests glowing plants / bioluminescent vegetation.
+ * Reference: 0.7 w × 1.3 h × 0.7 d.
+ */
+export function buildGlowFlora(ctx: Ctx, glowHex = 0x67e8f9): THREE.Group {
+  const g = newProp('glow_flora')
+  const stalk = ctx.mats.get(0x14231c, { rough: 0.95 })
+  const glow = ctx.mats.get(0x0a2030, {
+    rough: 0.35,
+    emissive: glowHex,
+    emissiveIntensity: 1.15,
+  })
+  for (let i = 0; i < 3; i++) {
+    const x = (ctx.rng() - 0.5) * 0.4
+    const z = (ctx.rng() - 0.5) * 0.4
+    const h = 0.7 + ctx.rng() * 0.6
+    g.add(mkMesh(ctx, ctx.geos.cyl(0.03, 0.05, h, 5), stalk, x, h / 2, z))
+    const bulb = mkMesh(ctx, ctx.geos.ico(0.12 + ctx.rng() * 0.08, 0), glow, x, h + 0.08, z)
+    bulb.scale.y = 1.3
+    bulb.updateMatrix()
+    g.add(bulb)
+  }
+  // Ground spores.
+  for (let i = 0; i < 2; i++) {
+    g.add(
+      mkMesh(
+        ctx,
+        ctx.geos.ico(0.07, 0),
+        glow,
+        (ctx.rng() - 0.5) * 0.6,
+        0.07,
+        (ctx.rng() - 0.5) * 0.6
+      )
+    )
+  }
+  recordProp(ctx, 'glow_flora')
+  return g
+}
+
+/**
+ * Stone altar — stepped base + slab + candle emissives.
+ * Reference: 1.6 w × 1.1 h × 1.0 d.
+ */
+export function buildAltar(ctx: Ctx, hex = 0x7a7264, glowHex = 0xffb36b): THREE.Group {
+  const g = newProp('altar')
+  const stone = ctx.mats.get(hex, { rough: 0.88 })
+  const flame = ctx.mats.get(0x05070c, {
+    rough: 0.5,
+    emissive: glowHex,
+    emissiveIntensity: 1.25,
+  })
+  g.add(mkMesh(ctx, ctx.geos.box(1.6, 0.3, 1.0), stone, 0, 0.15, 0))
+  g.add(mkMesh(ctx, ctx.geos.box(1.3, 0.28, 0.8), stone, 0, 0.44, 0))
+  g.add(mkMesh(ctx, ctx.geos.box(1.5, 0.12, 0.95), stone, 0, 0.64, 0))
+  // Two candle flames on the slab.
+  for (const sx of [-0.5, 0.5]) {
+    g.add(mkMesh(ctx, ctx.geos.cyl(0.05, 0.06, 0.18, 6), stone, sx, 0.79, 0))
+    g.add(mkMesh(ctx, ctx.geos.cone(0.05, 0.14, 5), flame, sx, 0.94, 0))
+  }
+  recordProp(ctx, 'altar')
+  return g
+}
+
 /** Simple multi-storey building block — body + window strips + roof lip. Reference: 10 × 8 × 8. */
 export function buildBuildingBlock(ctx: Ctx, hex = 0x32353d, litWindows = true): THREE.Group {
   const g = newProp('building')
