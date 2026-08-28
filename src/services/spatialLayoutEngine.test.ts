@@ -31,6 +31,9 @@ import {
   twoShotWideCamera,
   type LayoutInput,
   type ResolvedSceneObject,
+  getEntityAABB,
+  intersectsAABB,
+  resolveOverlapSeparation,
 } from './spatialLayoutEngine'
 import { mulberry32 } from './spatialLayoutEngine'
 import type { SceneGraph, SceneImportance, SceneObjectSpec, SceneRelation } from './sceneGraphTypes'
@@ -361,7 +364,76 @@ export function runSpatialLayoutSelfTest(): void {
 
   console.groupEnd()
 
-  // --- 11. Diagnostic report -----------------------------------------------
+  // --- 11. Focused AABB collision and separation tests ---------------------
+  console.group('  focused AABB collision & separation')
+
+  // 1. two overlapping boxes
+  console.group('    1. two overlapping boxes')
+  const boxA = mkResolved('boxA', 'crate', [0, 0, 0])
+  const boxB = mkResolved('boxB', 'crate', [0.1, 0, 0.1])
+  // Overlap is expected because crate scale reference is [0.8, 0.8, 0.8] and initial separation is small (0.1)
+  pass('boxA and boxB overlap initially', intersectsAABB(getEntityAABB(boxA), getEntityAABB(boxB)))
+  const separated = resolveOverlapSeparation([boxA, boxB], anchors)
+  const sepA = separated.find((o) => o.sourceSpecId === 'boxA')!
+  const sepB = separated.find((o) => o.sourceSpecId === 'boxB')!
+  pass('after separation, they do not overlap', !intersectsAABB(getEntityAABB(sepA), getEntityAABB(sepB)))
+  pass('after separation, transforms are finite', sepA.position.every(Number.isFinite) && sepB.position.every(Number.isFinite))
+  console.groupEnd()
+
+  // 2. chair near table without intersection
+  console.group('    2. chair near table without intersection')
+  const specChair = makeSpec('chair', 'chair', 'hero')
+  const specTable = makeSpec('table', 'table', 'supporting')
+  const sgTableChair = {
+    objects: [specChair, specTable],
+    relations: [{ type: 'near', subject: 'chair', object: 'table' }],
+    seed: 123,
+  } as SceneGraph
+  const layoutTC = planLayout({ sceneGraph: sgTableChair, objects: sgTableChair.objects, seed: 123, actorAnchors: anchors })
+  const tcChair = layoutTC.objects.find((o) => o.sourceSpecId === 'chair')!
+  const tcTable = layoutTC.objects.find((o) => o.sourceSpecId === 'table')!
+  const tcNear = relationSatisfied({ type: 'near', subject: 'chair', object: 'table' }, layoutTC.objects)
+  pass('chair is near table', tcNear.satisfied, tcNear.detail)
+  pass('chair and table do not intersect', !intersectsAABB(getEntityAABB(tcChair), getEntityAABB(tcTable)))
+  console.groupEnd()
+
+  // 3. crate behind machinery without overlap
+  console.group('    3. crate behind machinery without overlap')
+  const specCrate = makeSpec('crate', 'crate', 'hero')
+  const specMachine = makeSpec('machine', 'machine', 'supporting')
+  const sgMachineCrate = {
+    objects: [specCrate, specMachine],
+    relations: [{ type: 'behind', subject: 'crate', object: 'machine' }],
+    seed: 456,
+  } as SceneGraph
+  const layoutMC = planLayout({ sceneGraph: sgMachineCrate, objects: sgMachineCrate.objects, seed: 456, actorAnchors: anchors })
+  const mcCrate = layoutMC.objects.find((o) => o.sourceSpecId === 'crate')!
+  const mcMachine = layoutMC.objects.find((o) => o.sourceSpecId === 'machine')!
+  const mcBehind = relationSatisfied({ type: 'behind', subject: 'crate', object: 'machine' }, layoutMC.objects)
+  pass('crate is behind machinery', mcBehind.satisfied, mcBehind.detail)
+  pass('crate and machinery do not overlap', !intersectsAABB(getEntityAABB(mcCrate), getEntityAABB(mcMachine)))
+  console.groupEnd()
+
+  // 4. detective facing streetlight while remaining collision-free
+  console.group('    4. detective facing streetlight while remaining collision-free')
+  const specDetective = makeSpec('detective', 'detective', 'hero')
+  const specLamp = makeSpec('lamp', 'lamp_post', 'supporting')
+  const sgDetLamp = {
+    objects: [specDetective, specLamp],
+    relations: [{ type: 'facing', subject: 'detective', object: 'lamp' }],
+    seed: 789,
+  } as SceneGraph
+  const layoutDL = planLayout({ sceneGraph: sgDetLamp, objects: sgDetLamp.objects, seed: 789, actorAnchors: anchors })
+  const dlDetective = layoutDL.objects.find((o) => o.sourceSpecId === 'detective')!
+  const dlLamp = layoutDL.objects.find((o) => o.sourceSpecId === 'lamp')!
+  const dlFacing = relationSatisfied({ type: 'facing', subject: 'detective', object: 'lamp' }, layoutDL.objects)
+  pass('detective is facing streetlight', dlFacing.satisfied, dlFacing.detail)
+  pass('detective and streetlight do not collide', !intersectsAABB(getEntityAABB(dlDetective), getEntityAABB(dlLamp)))
+  console.groupEnd()
+
+  console.groupEnd()
+
+  // --- 12. Diagnostic report -----------------------------------------------
   console.log('[D3 LAYOUT] Determinism check:', r1.objects.length === r2.objects.length && r1.stats.objectCollisionRetries === r2.stats.objectCollisionRetries ? 'PASS' : 'FAIL')
   console.log('[D3 LAYOUT] Self-test complete.')
 }

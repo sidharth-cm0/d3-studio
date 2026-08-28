@@ -125,6 +125,39 @@ export interface RelationResolution {
   detail: string
 }
 
+export interface AABB {
+  minX: number
+  maxX: number
+  minY: number
+  maxY: number
+  minZ: number
+  maxZ: number
+}
+
+export function getEntityAABB(obj: ResolvedSceneObject): AABB {
+  const [x, y, z] = obj.position
+  const [sx, sy, sz] = obj.scale
+  return {
+    minX: x - sx / 2,
+    maxX: x + sx / 2,
+    minY: y - sy / 2,
+    maxY: y + sy / 2,
+    minZ: z - sz / 2,
+    maxZ: z + sz / 2,
+  }
+}
+
+export function intersectsAABB(a: AABB, b: AABB): boolean {
+  return (
+    a.minX < b.maxX &&
+    a.maxX > b.minX &&
+    a.minY < b.maxY &&
+    a.maxY > b.minY &&
+    a.minZ < b.maxZ &&
+    a.maxZ > b.minZ
+  )
+}
+
 export interface ZoneRect {
   id: LayoutZoneId
   x0: number
@@ -934,6 +967,118 @@ export function resolveRelations(
   return { objects: adjusted, resolutions }
 }
 
+export function resolveOverlap(
+  objA: ResolvedSceneObject,
+  objB: ResolvedSceneObject,
+  anchors: ActorAnchor[]
+): { nudgedA: [number, number, number]; nudgedB: [number, number, number] } {
+  const aabbA = getEntityAABB(objA)
+  const aabbB = getEntityAABB(objB)
+
+  if (!intersectsAABB(aabbA, aabbB)) {
+    return { nudgedA: objA.position, nudgedB: objB.position }
+  }
+
+  const overlapX = Math.min(aabbA.maxX, aabbB.maxX) - Math.max(aabbA.minX, aabbB.minX)
+  const overlapZ = Math.min(aabbA.maxZ, aabbB.maxZ) - Math.max(aabbA.minZ, aabbB.minZ)
+
+  let nudgeX = 0
+  let nudgeZ = 0
+
+  if (overlapX < overlapZ) {
+    const diff = objA.position[0] - objB.position[0]
+    const dir = diff === 0 ? (objA.sourceSpecId < objB.sourceSpecId ? -1 : 1) : (diff < 0 ? -1 : 1)
+    nudgeX = dir * overlapX
+  } else {
+    const diff = objA.position[2] - objB.position[2]
+    const dir = diff === 0 ? (objA.sourceSpecId < objB.sourceSpecId ? -1 : 1) : (diff < 0 ? -1 : 1)
+    nudgeZ = dir * overlapZ
+  }
+
+  const isAMovable = !ARCHITECTURE_TYPES.has(objA.semanticType.toLowerCase())
+  const isBMovable = !ARCHITECTURE_TYPES.has(objB.semanticType.toLowerCase())
+
+  let posA = [...objA.position] as [number, number, number]
+  let posB = [...objB.position] as [number, number, number]
+
+  if (isAMovable && isBMovable) {
+    const nextA_x = objA.position[0] + nudgeX * 0.5
+    const nextA_z = objA.position[2] + nudgeZ * 0.5
+    const nextB_x = objB.position[0] - nudgeX * 0.5
+    const nextB_z = objB.position[2] - nudgeZ * 0.5
+
+    const rA = footprintRadius(objA.scale)
+    const rB = footprintRadius(objB.scale)
+
+    if (isActorSafe(nextA_x, nextA_z, rA, anchors).safe) {
+      posA[0] = round3(nextA_x)
+      posA[2] = round3(nextA_z)
+    }
+    if (isActorSafe(nextB_x, nextB_z, rB, anchors).safe) {
+      posB[0] = round3(nextB_x)
+      posB[2] = round3(nextB_z)
+    }
+  } else if (isAMovable) {
+    const nextA_x = objA.position[0] + nudgeX
+    const nextA_z = objA.position[2] + nudgeZ
+    const rA = footprintRadius(objA.scale)
+    if (isActorSafe(nextA_x, nextA_z, rA, anchors).safe) {
+      posA[0] = round3(nextA_x)
+      posA[2] = round3(nextA_z)
+    }
+  } else if (isBMovable) {
+    const nextB_x = objB.position[0] - nudgeX
+    const nextB_z = objB.position[2] - nudgeZ
+    const rB = footprintRadius(objB.scale)
+    if (isActorSafe(nextB_x, nextB_z, rB, anchors).safe) {
+      posB[0] = round3(nextB_x)
+      posB[2] = round3(nextB_z)
+    }
+  }
+
+  return { nudgedA: posA, nudgedB: posB }
+}
+
+export function resolveOverlapSeparation(
+  objects: ResolvedSceneObject[],
+  anchors: ActorAnchor[]
+): ResolvedSceneObject[] {
+  const result = objects.map((obj) => ({
+    ...obj,
+    position: [...obj.position] as [number, number, number],
+    rotation: [...obj.rotation] as [number, number, number],
+    scale: [...obj.scale] as [number, number, number],
+  }))
+
+  const MAX_SEPARATION_ITERATIONS = 4
+  for (let iter = 0; iter < MAX_SEPARATION_ITERATIONS; iter++) {
+    let anyCollision = false
+    for (let i = 0; i < result.length; i++) {
+      for (let j = i + 1; j < result.length; j++) {
+        const objA = result[i]
+        const objB = result[j]
+
+        const isAMovable = !ARCHITECTURE_TYPES.has(objA.semanticType.toLowerCase())
+        const isBMovable = !ARCHITECTURE_TYPES.has(objB.semanticType.toLowerCase())
+        if (!isAMovable && !isBMovable) continue
+
+        const aabbA = getEntityAABB(objA)
+        const aabbB = getEntityAABB(objB)
+
+        if (intersectsAABB(aabbA, aabbB)) {
+          anyCollision = true
+          const { nudgedA, nudgedB } = resolveOverlap(objA, objB, anchors)
+          objA.position = nudgedA
+          objB.position = nudgedB
+        }
+      }
+    }
+    if (!anyCollision) break
+  }
+
+  return result
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -972,13 +1117,16 @@ export function planLayout(input: LayoutInput): LayoutOutput {
   const relations = input.sceneGraph?.relations ?? []
   const resolved = resolveRelations(objects, relations)
 
-  const heroCount = resolved.objects.filter((o) => o.importance === 'hero').length
-  const visibleHeroCount = resolved.objects.filter((o) => o.importance === 'hero' && o.cameraVisible).length
-  const visibleTotal = resolved.objects.filter((o) => o.cameraVisible).length
-  const frustumVisibleRatio = resolved.objects.length === 0 ? 1 : visibleTotal / resolved.objects.length
+  // Resolve any remaining or introduced overlaps using AABB separation
+  const finalObjects = resolveOverlapSeparation(resolved.objects, anchors)
+
+  const heroCount = finalObjects.filter((o) => o.importance === 'hero').length
+  const visibleHeroCount = finalObjects.filter((o) => o.importance === 'hero' && o.cameraVisible).length
+  const visibleTotal = finalObjects.filter((o) => o.cameraVisible).length
+  const frustumVisibleRatio = finalObjects.length === 0 ? 1 : visibleTotal / finalObjects.length
 
   const stats: LayoutStats = {
-    objectCount: resolved.objects.length,
+    objectCount: finalObjects.length,
     heroCount,
     visibleHeroCount,
     frustumVisibleRatio: round3(frustumVisibleRatio),
@@ -988,7 +1136,7 @@ export function planLayout(input: LayoutInput): LayoutOutput {
     placementFallbacks: ctx.placementFallbacks,
   }
 
-  return { objects: resolved.objects, stats }
+  return { objects: finalObjects, stats }
 }
 
 /**
