@@ -445,10 +445,102 @@ export function runDynamicEnvironmentSelfTest(): void {
   }
   console.groupEnd()
 
+  // --- M. Entity visual integration (Step B) -----------------------------------
+  console.group('  M. Entity visual integration')
+  {
+    const failuresBefore = failureCount
+    const parsed = parseSceneGraph('A box in front of a door, a lamp left of a sofa, and a chair near a table.')
+    const sg = parsed.sceneGraph
+
+    // Inject explicit resolved objects for the 6 supported entity types so the
+    // test is deterministic regardless of parser output.
+    const resolvedObjects = [
+      makeResolved('box1', 'box', [1, 1, 1], [0, 0.5, 1]),
+      makeResolved('door1', 'door', [1.2, 2.3, 0.15], [2, 1.15, -1]),
+      makeResolved('lamp1', 'lamp', [1, 1, 1], [-2, 0.85, -2]),
+      makeResolved('sofa1', 'sofa', [2.1, 0.85, 0.9], [1.5, 0.42, -3]),
+      makeResolved('chair1', 'chair', [0.5, 0.9, 0.5], [-1.5, 0.45, -2.5]),
+      makeResolved('table1', 'table', [1.2, 0.75, 0.7], [0, 0.375, -2.5]),
+      makeResolved('machine1', 'machine', [2.2, 2.4, 1.4], [-3, 1.2, -4]),
+      makeResolved('pillar1', 'pillar', [0.9, 4.2, 0.9], [3, 2.1, -5]),
+      makeResolved('unsupported1', 'spaceship', [5.5, 2.6, 7], [0, 1.3, -6]),
+    ]
+    const result = buildDynamicEnvironment({
+      sceneGraph: sg,
+      resolvedObjects,
+      assetMatches: [],
+      seed: 12345,
+    })
+
+    // 1-3) All supported categories appear as entity visuals
+    const names: string[] = []
+    result.group.traverse((o) => { if (o.name.startsWith('entity:')) names.push(o.name) })
+    pass('box entity visual present', names.some((n) => n.includes(':box1:box')), `entity names=${names.join(',')}`)
+    pass('door entity visual present', names.some((n) => n.includes(':door1:door')), `entity names=${names.join(',')}`)
+    pass('lamp entity visual present', names.some((n) => n.includes(':lamp1:lamp')), `entity names=${names.join(',')}`)
+    pass('sofa entity visual present', names.some((n) => n.includes(':sofa1:sofa')), `entity names=${names.join(',')}`)
+    pass('chair entity visual present', names.some((n) => n.includes(':chair1:chair')), `entity names=${names.join(',')}`)
+    pass('table entity visual present', names.some((n) => n.includes(':table1:table')), `entity names=${names.join(',')}`)
+    pass('machinery entity visual present', names.some((n) => n.includes(':machine1:machine')), `entity names=${names.join(',')}`)
+    pass('pillar entity visual present', names.some((n) => n.includes(':pillar1:pillar')), `entity names=${names.join(',')}`)
+
+    // 4) Names preserve IDs
+    pass('entity names preserve source IDs', names.length >= 8, `count=${names.length}`)
+
+    // 5) Resolved positions unchanged
+    const findEntity = (id: string): import('three').Object3D | undefined => {
+      let found: import('three').Object3D | undefined
+      result.group.traverse((o) => {
+        if (o.userData?.sourceSpecId === id && o.name.startsWith('entity:')) found = o
+      })
+      return found
+    }
+    const boxEntity = findEntity('box1')
+    pass('box position matches resolved transform',
+      !!boxEntity && Math.abs(boxEntity.position.x - 0) < 1e-6 && Math.abs(boxEntity.position.y - 0.5) < 1e-6 && Math.abs(boxEntity.position.z - 1) < 1e-6,
+      boxEntity ? `pos=${boxEntity.position.x},${boxEntity.position.y},${boxEntity.position.z}` : 'not found')
+    const doorEntity = findEntity('door1')
+    pass('door position matches resolved transform',
+      !!doorEntity && Math.abs(doorEntity.position.x - 2) < 1e-6 && Math.abs(doorEntity.position.y - 1.15) < 1e-6 && Math.abs(doorEntity.position.z - (-1)) < 1e-6,
+      doorEntity ? `pos=${doorEntity.position.x},${doorEntity.position.y},${doorEntity.position.z}` : 'not found')
+
+    // 6) Unsupported type (spaceship) does not crash and is not rendered as entity visual
+    pass('unsupported type skipped gracefully', !names.some((n) => n.includes(':unsupported1:spaceship')), `entity names=${names.join(',')}`)
+
+    // Entity visuals are children of the objects group
+    const objectsGroup = result.group.children.find((c) => c.name === 'dyn:objects')
+    const entityInObjectsGroup = objectsGroup?.children.some((c) => c.name.startsWith('entity:')) ?? false
+    pass('entity visuals added to objects group', entityInObjectsGroup)
+
+    results.push({ name: 'Entity visual integration', ok: failureCount === failuresBefore })
+  }
+  console.groupEnd()
+
   // --- Summary -----------------------------------------------------------------
   const failed = results.filter((r) => !r.ok)
   console.log(
     `[D3 DYNAMIC] Self-test complete: ${results.length - failed.length}/${results.length} scenes PASS` +
       (failed.length ? ` — FAILED: ${failed.map((f) => f.name).join(', ')}` : '')
   )
+}
+
+function makeResolved(
+  id: string,
+  semanticType: string,
+  scale: [number, number, number],
+  position: [number, number, number]
+): import('./spatialLayoutEngine').ResolvedSceneObject {
+  return {
+    sourceSpecId: id,
+    semanticType,
+    importance: 'supporting',
+    position,
+    rotation: [0, 0, 0],
+    scale,
+    zone: 'midground',
+    cameraVisible: true,
+    actorSafe: true,
+    occlusionSafe: true,
+    fallbackPrimitive: 'compound',
+  }
 }

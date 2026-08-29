@@ -342,6 +342,12 @@ export default function App() {
     // scenes/environments never leaks GPU resources. The procedural props
     // group is disposed explicitly first; the whole-stage deep sweep after it
     // is idempotent (three.js dispose is safe to call twice).
+    if (import.meta.env.DEV) {
+      const prevEntities = propsGroupRef.current
+        ? Array.from(propsGroupRef.current.children).filter((c) => c.name.startsWith('entity:')).map((c) => c.name)
+        : []
+      console.log(`[D3 LIFECYCLE] DISPOSE prev propsGroupRef entities=[${prevEntities.join(', ') || 'none'}]`)
+    }
     if (propsGroupRef.current) {
       disposeObjectDeep(propsGroupRef.current)
       propsGroupRef.current = null
@@ -391,6 +397,13 @@ export default function App() {
     if (dynamicOverride) {
       propsGroupRef.current = dynamicOverride.group
       stageGroup.add(dynamicOverride.group)
+      if (import.meta.env.DEV) {
+        const dynObjects = dynamicOverride.group.children.find((c) => c.name === 'dyn:objects')
+        const entities = dynObjects
+          ? Array.from(dynObjects.children).filter((c) => c.name.startsWith('entity:')).map((c) => c.name)
+          : []
+        console.log(`[D3 LIFECYCLE] ATTACH group=${dynamicOverride.group.name} dynObjectsChildren=${dynObjects?.children.length ?? 0} entities=[${entities.join(', ') || 'none'}]`)
+      }
     } else if (!env.useBaseStage) {
       const envGroup = buildEnvironmentGroup(env)
       propsGroupRef.current = envGroup
@@ -401,6 +414,9 @@ export default function App() {
     }
 
     scene.add(stageGroup)
+    if (import.meta.env.DEV) {
+      console.log(`[D3 STAGE] stageGroup added to scene. scene.children: ${scene.children.map((c) => c.name || c.type).join(', ')}`)
+    }
 
     // --- atmosphere: sky background + depth fog ---
     const atmosphere = dynamicOverride?.sceneGraph.atmosphere
@@ -463,12 +479,28 @@ export default function App() {
 
   /** Route optimized templates to the existing builder; all other scenes use Phase 3. */
   const applyEnvironmentRoute = (searchText: string, env: ResolvedEnvironment) => {
+    if (import.meta.env.DEV) {
+      console.log(`[D3 LIFECYCLE] ROUTE searchText="${searchText.substring(0, 80)}"`)
+    }
     try {
       const parsed = parseSceneGraph(searchText)
+      if (import.meta.env.DEV) {
+        console.group('[D3 ROUTE] applyEnvironmentRoute')
+        console.log(`  searchText: "${searchText}"`)
+        console.log(`  template: ${parsed.template ? parsed.template.kind : 'null (dynamic)'}`)
+        console.log('  parsed sceneGraph objects:')
+        for (const o of parsed.sceneGraph.objects) {
+          console.log(`    - ${o.id} (${o.semanticType}) importance=${o.importance}`)
+        }
+      }
       if (parsed.template === null) {
         const sceneGraph = parsed.sceneGraph
         const signature = `dynamic:${sceneGraph.seed}:${sceneGraph.environment.type}`
-        if (signature === appliedEnvKeyRef.current) return
+        if (signature === appliedEnvKeyRef.current) {
+          if (import.meta.env.DEV) console.log('  SKIP: signature unchanged', signature)
+          if (import.meta.env.DEV) console.groupEnd()
+          return
+        }
         const assetMatches = matchAssetsSync(
           sceneGraph.objects,
           undefined,
@@ -479,6 +511,12 @@ export default function App() {
           objects: sceneGraph.objects,
           seed: sceneGraph.seed,
         })
+        if (import.meta.env.DEV) {
+          console.log('  planLayout resolvedObjects:')
+          for (const ro of layout.objects) {
+            console.log(`    - ${ro.sourceSpecId} (${ro.semanticType}) pos=[${ro.position.map((v) => v.toFixed(2)).join(',')}] zone=${ro.zone}`)
+          }
+        }
         const dynamic = buildDynamicEnvironment({
           sceneGraph,
           resolvedObjects: layout.objects,
@@ -486,10 +524,52 @@ export default function App() {
           seed: sceneGraph.seed,
           layoutStats: layout.stats,
         })
+        if (import.meta.env.DEV) {
+          console.log(`  dynamic.group.children: ${dynamic.group.children.length}`)
+          console.log(`  dynamic.stats.entityVisualCount: ${dynamic.stats.proceduralCount}`)
+          const dynObjects = dynamic.group.children.find((c) => c.name === 'dyn:objects')
+          console.log(`  dyn:objects children: ${dynObjects?.children.length ?? 0}`)
+        }
         if (dynamic.group.children.length === 0) {
           disposeObjectDeep(dynamic.group)
           throw new Error('Phase 3 returned an empty environment group')
         }
+        // Spatial visibility diagnostics
+        if (import.meta.env.DEV && cameraRef.current) {
+          const cam = cameraRef.current
+          console.log(`[D3 SPATIAL] camera pos=[${cam.position.x.toFixed(2)},${cam.position.y.toFixed(2)},${cam.position.z.toFixed(2)}] fov=${cam.fov} near=${cam.near} far=${cam.far} aspect=${cam.aspect.toFixed(2)}`)
+          const frustum = new THREE.Frustum()
+          const projMatrix = new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse)
+          frustum.setFromProjectionMatrix(projMatrix)
+          const worldBox = new THREE.Box3()
+          const worldPos = new THREE.Vector3()
+          const rows: Array<{ id: string; type: string; worldX: number; worldY: number; worldZ: number; width: number; height: number; depth: number; distance: number; inFrustum: boolean; visible: boolean }> = []
+          dynamic.group.traverse((obj) => {
+            if (!obj.name.startsWith('entity:')) return
+            obj.updateMatrixWorld(true)
+            obj.getWorldPosition(worldPos)
+            worldBox.setFromObject(obj)
+            const size = new THREE.Vector3()
+            worldBox.getSize(size)
+            const parts = obj.name.split(':')
+            rows.push({
+              id: parts[1] ?? '',
+              type: parts[2] ?? '',
+              worldX: Number(worldPos.x.toFixed(2)),
+              worldY: Number(worldPos.y.toFixed(2)),
+              worldZ: Number(worldPos.z.toFixed(2)),
+              width: Number(size.x.toFixed(2)),
+              height: Number(size.y.toFixed(2)),
+              depth: Number(size.z.toFixed(2)),
+              distance: Number(cam.position.distanceTo(worldPos).toFixed(2)),
+              inFrustum: frustum.intersectsBox(worldBox),
+              visible: obj.visible,
+            })
+          })
+          console.table(rows)
+        }
+        if (import.meta.env.DEV) console.log('  → calling buildStageEnvironment with dynamicOverride')
+        if (import.meta.env.DEV) console.groupEnd()
         buildStageEnvironment(env.preset, env, {
           group: dynamic.group,
           sceneGraph,
@@ -498,7 +578,13 @@ export default function App() {
         return
       }
 
-      if (env.signature === appliedEnvKeyRef.current) return
+      if (env.signature === appliedEnvKeyRef.current) {
+        if (import.meta.env.DEV) console.log('  SKIP: env signature unchanged', env.signature)
+        if (import.meta.env.DEV) console.groupEnd()
+        return
+      }
+      if (import.meta.env.DEV) console.log('  → calling buildStageEnvironment (legacy, optimized template)')
+      if (import.meta.env.DEV) console.groupEnd()
       buildStageEnvironment(
         env.preset,
         env,
@@ -508,6 +594,8 @@ export default function App() {
     } catch (error) {
       console.warn('Phase 3 environment route failed; using legacy environment:', error)
       if (env.signature === appliedEnvKeyRef.current) return
+      if (import.meta.env.DEV) console.log('  → legacy fallback after error')
+      if (import.meta.env.DEV) console.groupEnd()
       buildStageEnvironment(env.preset, env, undefined, 'Phase 3 failed; legacy fallback')
     }
   }
@@ -849,7 +937,7 @@ export default function App() {
    */
   const applySceneEnvironment = (scene: D3Scene, episode: D3Episode) => {
     const location = episode.locations?.find((l) => l.id === scene.locationId)
-    const sceneText = [
+    const sceneMetadataText = [
       scene.title,
       location?.name,
       location?.description,
@@ -859,8 +947,21 @@ export default function App() {
     ]
       .filter(Boolean)
       .join(' · ')
+    // The story prompt is the authoritative source of entity keywords for the
+    // dynamic environment. Scene metadata alone (title, location name, mood)
+    // does not contain the concrete objects the user asked for, so always
+    // prepend the raw prompt to the search text.
+    const selectedSearchText = mode === 'story' && storyPrompt
+      ? `${storyPrompt} · ${sceneMetadataText}`
+      : sceneMetadataText
+    if (import.meta.env.DEV) {
+      console.log('[D3 PROMPT SOURCE]')
+      console.log(`  storyInput=${storyPrompt.substring(0, 80)}...`)
+      console.log(`  shotText=${sceneMetadataText.substring(0, 80)}...`)
+      console.log(`  selectedSearchText=${selectedSearchText.substring(0, 120)}...`)
+    }
     const env = EnvironmentResolverService.resolve({
-      searchText: sceneText,
+      searchText: selectedSearchText,
       timeOfDay: scene.timeOfDay,
       emotionalTone: scene.emotionalTone,
       fallbackPreset: (location?.presetStageId ?? currentStage) as D3StagePresetId,
@@ -869,7 +970,10 @@ export default function App() {
       seedKey: location?.id ?? scene.id,
     })
     if (env.preset !== currentStage) setCurrentStage(env.preset)
-    applyEnvironmentRoute(sceneText, env)
+    if (import.meta.env.DEV) {
+      console.log(`[D3 LIFECYCLE] SCENE_ENV scene=${scene.id} episode=${episode.id}`)
+    }
+    applyEnvironmentRoute(selectedSearchText, env)
   }
 
   /**
