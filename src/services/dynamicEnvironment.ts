@@ -117,6 +117,12 @@ import {
   buildTent,
   buildVehicle,
 } from './dynamicEnvironmentCompounds'
+import { buildEntityVisual, resolveVisualCategory } from './entityVisualResolver'
+
+/** Categories supported by the entityVisualResolver's buildEntityVisual(). */
+const ENTITY_VISUAL_CATEGORIES = new Set([
+  'crate', 'door', 'lamp', 'streetlight', 'sofa', 'chair', 'table', 'machinery', 'pillar',
+])
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -1518,6 +1524,7 @@ export function buildDynamicEnvironment(input: DynamicEnvironmentInput): Dynamic
   let heroObjectCount = 0
   let assetCount = 0
   let proceduralCount = 0
+  let entityVisualCount = 0
   let unsafeCount = 0
   let occlCount = 0
   const depthBands = new Set<string>()
@@ -1536,6 +1543,35 @@ export function buildDynamicEnvironment(input: DynamicEnvironmentInput): Dynamic
     if (!ro.occlusionSafe) occlCount++
 
     const t = ro.semanticType.toLowerCase()
+
+    // Supported entity-visual categories take the dedicated buildEntityVisual
+    // path FIRST — recognizable multi-part geometry with stable entity: names.
+    // This prevents generic dispatchProp/instancing from consuming the object.
+    const entityCategory = resolveVisualCategory(t)
+    if (import.meta.env.DEV) {
+      console.log(`[D3 STAGE-TRACE] ro=${ro.sourceSpecId} type=${ro.semanticType} category=${entityCategory} supported=${ENTITY_VISUAL_CATEGORIES.has(entityCategory)}`)
+    }
+    if (ENTITY_VISUAL_CATEGORIES.has(entityCategory)) {
+      const visual = buildEntityVisual(ro)
+      if (import.meta.env.DEV) console.log(`[D3 STAGE-TRACE] buildEntityVisual(${ro.sourceSpecId}) => ${visual ? visual.name : 'null'}`)
+      if (visual) {
+        visual.userData = {
+          ...visual.userData,
+          importance: ro.importance,
+          zone: ro.zone,
+          source: 'entity',
+          resolved: ro,
+          actorSafe: ro.actorSafe,
+          occlusionSafe: ro.occlusionSafe,
+          cameraVisible: ro.cameraVisible,
+          heroVisible: ro.heroVisible ?? null,
+        }
+        objectsGroup.add(visual)
+        entityVisualCount++
+        continue
+      }
+    }
+
     const familySpec = ro.importance === 'hero' ? undefined : INSTANCED_FAMILIES[t]
     if (familySpec && instancedTypes.has(t)) {
       const batch = batches.get(t) ?? { spec: familySpec, placements: [] as Placement[] }
@@ -1590,6 +1626,15 @@ export function buildDynamicEnvironment(input: DynamicEnvironmentInput): Dynamic
     if (batch.placements.length === 0) continue
     const mesh = mkInstanced(ctx, batch.spec.geo(ctx), batch.spec.mat(ctx), batch.placements, `fam_${key}`, { jitter: batch.spec.jitter })
     objectsGroup.add(mesh)
+  }
+
+  // DEV-only: prove what dyn:objects actually contains before ATTACH.
+  if (import.meta.env.DEV) {
+    const dynNames = objectsGroup.children.map((c) => c.name)
+    const entityNames = dynNames.filter((n) => n.startsWith('entity:'))
+    console.log(`[D3 STAGE-TRACE] entityVisualCount=${entityVisualCount} dyn:objects children=${objectsGroup.children.length}`)
+    console.log(`[D3 STAGE-TRACE] dyn:objects names=[${dynNames.join(', ')}]`)
+    console.log(`[D3 STAGE-TRACE] entity names=[${entityNames.join(', ') || 'NONE'}]`)
   }
 
   // Empty/minimal graphs still receive readable contextual geometry between
