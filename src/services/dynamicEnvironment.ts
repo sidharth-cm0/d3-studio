@@ -124,6 +124,18 @@ const ENTITY_VISUAL_CATEGORIES = new Set([
   'crate', 'door', 'lamp', 'streetlight', 'sofa', 'chair', 'table', 'machinery', 'pillar',
 ])
 
+// Indoor room detection — generates a complete room with furniture
+const INDOOR_ROOM_KEYWORDS = new Set([
+  'room', 'inside', 'interior', 'house', 'home', 'apartment', 'hall',
+  'office', 'bedroom', 'living room', 'living_room',
+])
+
+function isIndoorRoom(env: string): boolean {
+  const e = env.toLowerCase().trim().replace(/[_-]/g, ' ')
+  if (INDOOR_ROOM_KEYWORDS.has(e)) return true
+  return ['room', 'indoor', 'interior', 'house', 'home', 'apartment', 'hall', 'office', 'bedroom', 'living room'].some(kw => e.includes(kw))
+}
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -303,6 +315,11 @@ function resolveGroundPlan(sg: SceneGraph): GroundPlan {
     : semanticColor
   const relief = safeNum(sg.ground.relief, 0.3)
 
+  // Indoor room types get a wood interior floor regardless of ground type
+  if (isIndoorRoom(env)) {
+    return { profile: 'interior', interiorStyle: 'wood', colorHex, relief: 0 }
+  }
+
   if (gt === 'road' || gt === 'street' || gt === 'asphalt' || env === 'street' || env === 'vehicle_scene') {
     return { profile: 'asphalt', interiorStyle: 'plain', colorHex: mixHex(colorHex, 0x0c0d12, 0.55), relief: 0 }
   }
@@ -463,7 +480,7 @@ function resolveBackdropKind(sg: SceneGraph): BackdropKind {
   // A cave is semantically indoor, but its enclosure must be generated as a
   // rocky cavern shell rather than falling through to generic room walls.
   if (env === 'cave') return 'cavern'
-  if (indoor || env === 'shop' || env === 'cyberpunk' || env === 'laboratory' || env === 'hospital' || env === 'school' || env === 'office' || env === 'castle' || env === 'apartment' || env === 'factory') return 'walls'
+  if (indoor || isIndoorRoom(env) || env === 'shop' || env === 'cyberpunk' || env === 'laboratory' || env === 'hospital' || env === 'school' || env === 'office' || env === 'castle' || env === 'apartment' || env === 'factory') return 'walls'
   if (env === 'desert') return 'dunes'
   if (env === 'forest' || env === 'camp' || env === 'garden' || env === 'waterside' || env === 'beach' || env === 'village') return 'trees'
   if (env === 'street' || env === 'vehicle_scene' || env === 'city') return 'skyline'
@@ -552,6 +569,8 @@ function buildBackdrop(ctx: Ctx, sg: SceneGraph, practicals: Practical[]): Backd
         ctx.group.add(torch)
         if (lit) practicals.push({ kind: 'torch', position: [sx, 2.55, -8.0], color: '#ffb36b' })
       }
+    } else if (isIndoorRoom(env) && ctx.count < 45) {
+      buildIndoorRoomFurniture(ctx, lit, practicals)
     } else if (ctx.count < 42) {
       for (const sx of [-3.4, 3.4]) {
         ctx.group.add(mkWallPanel(ctx, 3.0, 2.2, mixHex(ctx.palette.wall, 0xffffff, 0.1), sx, 1.9, -8.15))
@@ -718,6 +737,48 @@ function mkWallPanel(ctx: Ctx, w: number, h: number, hex: number, x: number, y: 
   g.matrixAutoUpdate = false
   g.updateMatrix()
   return g
+}
+
+/**
+ * Indoor room furniture — door, table, chair, sofa, lamp.
+ * Reuses existing builders (buildDoorway, buildTable, buildChair, buildSofa,
+ * buildLampPost) with fixed positions relative to the backdrop walls.
+ */
+function buildIndoorRoomFurniture(ctx: Ctx, lit: boolean, practicals: Practical[]): void {
+  const woodHex = 0x5c4531
+  // Door on the back wall (right side)
+  const door = buildDoorway(ctx, 1.2, 2.4)
+  door.position.set(3.5, 0, -8.2)
+  door.matrixAutoUpdate = false
+  door.updateMatrix()
+  ctx.group.add(door)
+  // Table in the center
+  const table = buildTable(ctx, 1.6, 0.8, 0.9, woodHex)
+  table.position.set(0, 0, -3)
+  table.matrixAutoUpdate = false
+  table.updateMatrix()
+  ctx.group.add(table)
+  // Chair near the table (facing the table)
+  const chair = buildChair(ctx, woodHex)
+  chair.position.set(0, 0, -1.6)
+  chair.rotation.y = Math.PI
+  chair.matrixAutoUpdate = false
+  chair.updateMatrix()
+  ctx.group.add(chair)
+  // Sofa against the back wall (left side)
+  const sofa = buildSofa(ctx, woodHex)
+  sofa.position.set(-3.5, 0, -7.5)
+  sofa.matrixAutoUpdate = false
+  sofa.updateMatrix()
+  ctx.group.add(sofa)
+  // Floor lamp near the sofa
+  const lamp = buildLampPost(ctx, 1.6, lit)
+  lamp.position.set(2.5, 0, -7)
+  lamp.matrixAutoUpdate = false
+  lamp.updateMatrix()
+  ctx.group.add(lamp)
+  if (lit) practicals.push({ kind: 'lamp', position: [2.5, 1.6, -7], color: '#ffb36b' })
+  recordProp(ctx, 'indoor_furniture')
 }
 
 // ---------------------------------------------------------------------------

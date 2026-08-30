@@ -1,0 +1,26 @@
+{
+  "id": "char_example_001",
+  "gender": "male",
+  "age": {
+    "category": "elderly",
+    "exact": 65
+  },
+  "bodyBuild": "average",
+  "height": "average",
+  "hair": {
+    "style": "short",
+    "color": "gray"
+  },
+  "skinTone": "medium",
+  "clothing": {
+    "category": "uniform",
+    "description": "police uniform",
+    "color": "#1a237e"
+  },
+  "occupation": "police_officer",
+  "accessories": [
+    { "type": "badge" },
+    { "type": "hat", "description": "police cap" }
+  ],
+  "notes": "A 65 year old male police officer"
+}

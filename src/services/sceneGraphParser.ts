@@ -332,7 +332,7 @@ const CONCEPTS: ConceptRule[] = [
   },
   {
     id: 'obj_crate',
-    keys: /\b(crates?|boxes|cargo|containers?)\b/,
+    keys: /\b(crates?|box(es)?|cargo|containers?)\b/,
     objects: [['crate', 'dressing']],
   },
   {
