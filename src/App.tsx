@@ -444,6 +444,9 @@ export default function App() {
   /** Plain glTF (non-VRM) actor models, e.g. Quaternius characters. */
   const actor1GltfSceneRef = useRef<THREE.Object3D | null>(null)
   const actor2GltfSceneRef = useRef<THREE.Object3D | null>(null)
+  /** Monotonic per-slot load tokens — a stale in-flight load never replaces a newer model. */
+  const actor1LoadTokenRef = useRef(0)
+  const actor2LoadTokenRef = useRef(0)
   /** Effective slot visibility derived from the last character presence. */
   const characterVisibilityRef = useRef<{ leadVisible: boolean; supportingVisible: boolean }>({
     leadVisible: true,
@@ -1223,6 +1226,11 @@ export default function App() {
     if (import.meta.env.DEV && clipName !== IDLE_CLIP_NAME) {
       console.log(`[D3 ${logTag}] actor=${actorNum} clip=${clipName}`)
     }
+    if (import.meta.env.DEV && LOCOMOTION_PRESETS[clipName]) {
+      console.log(
+        `[D3 WALK CLIP] actor=${actorNum} requested=${clipName} resolved=${nextClip.name} mixerExists=true actionStarted=true`
+      )
+    }
     return nextAction
   }
 
@@ -1281,6 +1289,9 @@ export default function App() {
             loco.active = true
             loco.speed = preset.speed
             loco.remainingDistance = travel
+            if (import.meta.env.DEV) {
+              console.log(`[D3 WALK START] actor=${actorNum} clip=${clipName} target=${targetType}`)
+            }
             playActorClip(actorNum, clipName)
             return
           }
@@ -1300,6 +1311,9 @@ export default function App() {
     loco.active = true
     loco.speed = preset.speed
     loco.remainingDistance = distance
+    if (import.meta.env.DEV) {
+      console.log(`[D3 WALK START] actor=${actorNum} clip=${clipName} target=fixed-distance`)
+    }
     playActorClip(actorNum, clipName)
   }
 
@@ -1677,7 +1691,9 @@ export default function App() {
     if (actorNum === 1) actor1MixerRef.current = mixer
     else actor2MixerRef.current = mixer
     if (import.meta.env.DEV) {
-      console.log(`[D3 ACTOR ANIMATION] actor=${actorNum} clip=${idleClip.name}`)
+      console.log(
+        `[D3 ACTOR ATTACHED] actor=${actorNum} clip=${idleClip.name} mixerRootMatchesModel=${(mixer.getRoot() as THREE.Object3D) === model} actionStarted=true`
+      )
     }
 
     // A fresh model always defaults to Idle_Loop; consume any locomotion
@@ -1700,9 +1716,38 @@ export default function App() {
     }
   }
 
+  /** Remove the slot's current model (VRM scene and/or glTF scene) from the live scene — logged. */
+  const removeActorScene = (actorNum: 1 | 2) => {
+    const vrm = actorNum === 1 ? actor1VrmRef.current : actor2VrmRef.current
+    const gltf = actorNum === 1 ? actor1GltfSceneRef.current : actor2GltfSceneRef.current
+    if (vrm) {
+      sceneRef.current?.remove(vrm.scene)
+      if (actorNum === 1) actor1VrmRef.current = null
+      else actor2VrmRef.current = null
+    }
+    if (gltf) {
+      if (import.meta.env.DEV) {
+        const removedUrl = actorNum === 1 ? actor1SourceUrlRef.current : actor2SourceUrlRef.current
+        console.log(`[D3 ACTOR REMOVED] actor=${actorNum} url=${removedUrl}`)
+      }
+      sceneRef.current?.remove(gltf)
+      if (actorNum === 1) actor1GltfSceneRef.current = null
+      else actor2GltfSceneRef.current = null
+    }
+  }
+
   const loadActorModel = (actorNum: 1 | 2, url: string, skipProbe = false) => {
     if (!sceneRef.current) return
     setStatus(`Loading Actor ${actorNum}...`)
+
+    // Monotonic per-slot load token: an older in-flight load (e.g. the mount
+    // /avatar.vrm) must never remove or replace a model that started loading
+    // AFTER it — the newest request for a slot always wins.
+    const loadToken = (actorNum === 1 ? actor1LoadTokenRef.current : actor2LoadTokenRef.current) + 1
+    if (actorNum === 1) actor1LoadTokenRef.current = loadToken
+    else actor2LoadTokenRef.current = loadToken
+    const isStaleLoad = () =>
+      (actorNum === 1 ? actor1LoadTokenRef.current : actor2LoadTokenRef.current) !== loadToken
 
     // Local path: verify it really serves a VRM before loading; otherwise go
     // straight to the sample VRM (uploaded blob:/https: URLs skip this check).
@@ -1723,6 +1768,8 @@ export default function App() {
     loader.load(
       url,
       (gltf) => {
+        // A newer load for this slot superseded this response — discard it.
+        if (isStaleLoad()) return
         const vrm = gltf.userData.vrm as VRM | undefined
         if (vrm) {
           VRMUtils.removeUnnecessaryVertices(gltf.scene)
@@ -1737,24 +1784,12 @@ export default function App() {
           stopActorMixer(actorNum)
 
           if (actorNum === 1) {
-            if (actor1VrmRef.current && sceneRef.current) {
-              sceneRef.current.remove(actor1VrmRef.current.scene)
-            }
-            if (actor1GltfSceneRef.current && sceneRef.current) {
-              sceneRef.current.remove(actor1GltfSceneRef.current)
-            }
-            actor1GltfSceneRef.current = null
+            removeActorScene(1)
             actor1VrmRef.current = vrm
             actor1SourceUrlRef.current = url
             applyCustomAvatarFeatures(vrm)
           } else {
-            if (actor2VrmRef.current && sceneRef.current) {
-              sceneRef.current.remove(actor2VrmRef.current.scene)
-            }
-            if (actor2GltfSceneRef.current && sceneRef.current) {
-              sceneRef.current.remove(actor2GltfSceneRef.current)
-            }
-            actor2GltfSceneRef.current = null
+            removeActorScene(2)
             actor2VrmRef.current = vrm
             actor2SourceUrlRef.current = url
           }
@@ -1784,23 +1819,11 @@ export default function App() {
         model.rotation.y = actorNum === 1 ? 0.25 : -0.25
 
         if (actorNum === 1) {
-          if (actor1VrmRef.current && sceneRef.current) {
-            sceneRef.current.remove(actor1VrmRef.current.scene)
-          }
-          if (actor1GltfSceneRef.current && sceneRef.current) {
-            sceneRef.current.remove(actor1GltfSceneRef.current)
-          }
-          actor1VrmRef.current = null
+          removeActorScene(1)
           actor1GltfSceneRef.current = model
           actor1SourceUrlRef.current = url
         } else {
-          if (actor2VrmRef.current && sceneRef.current) {
-            sceneRef.current.remove(actor2VrmRef.current.scene)
-          }
-          if (actor2GltfSceneRef.current && sceneRef.current) {
-            sceneRef.current.remove(actor2GltfSceneRef.current)
-          }
-          actor2VrmRef.current = null
+          removeActorScene(2)
           actor2GltfSceneRef.current = model
           actor2SourceUrlRef.current = url
         }
@@ -1810,6 +1833,31 @@ export default function App() {
         // Same presence-driven slot visibility as the VRM path.
         const { leadVisible, supportingVisible } = characterVisibilityRef.current
         model.visible = actorNum === 1 ? leadVisible : supportingVisible
+
+        // One-shot DEV diagnostic (event-based, never per frame): transform,
+        // mesh visibility and Box3 sanity for the freshly loaded model.
+        if (import.meta.env.DEV) {
+          const box = new THREE.Box3().setFromObject(model)
+          const center = box.getCenter(new THREE.Vector3())
+          const size = box.getSize(new THREE.Vector3())
+          let meshCount = 0
+          let visibleMeshCount = 0
+          model.traverse((o) => {
+            if ((o as THREE.Mesh).isMesh) {
+              meshCount++
+              if (o.visible) visibleMeshCount++
+            }
+          })
+          const finiteTransforms =
+            Number.isFinite(model.position.x) && Number.isFinite(model.position.y) && Number.isFinite(model.position.z) &&
+            Number.isFinite(model.scale.x) && Number.isFinite(model.scale.y) && Number.isFinite(model.scale.z) &&
+            Number.isFinite(model.quaternion.x) && Number.isFinite(model.quaternion.y) &&
+            Number.isFinite(model.quaternion.z) && Number.isFinite(model.quaternion.w)
+          const gender = url === MALE_GLTF_URL ? 'male' : url === FEMALE_GLTF_URL ? 'female' : 'other'
+          console.log(
+            `[D3 ACTOR LOADED]\nactor=${actorNum} gender=${gender}\nsource=${url}\nrootAttached=${model.parent === sceneRef.current}\nmeshCount=${meshCount} visibleMeshCount=${visibleMeshCount}\nposition=(${model.position.x.toFixed(2)},${model.position.y.toFixed(2)},${model.position.z.toFixed(2)}) scale=(${model.scale.x.toFixed(2)},${model.scale.y.toFixed(2)},${model.scale.z.toFixed(2)})\nfineTransforms=${finiteTransforms}\nboxCenter=(${center.x.toFixed(2)},${center.y.toFixed(2)},${center.z.toFixed(2)}) boxSize=(${size.x.toFixed(2)},${size.y.toFixed(2)},${size.z.toFixed(2)})`
+          )
+        }
 
         setStatus(`🎯 Actor ${actorNum} Ready on Stage`)
 
@@ -1829,6 +1877,8 @@ export default function App() {
       },
       undefined,
       (err) => {
+        // A newer load for this slot superseded this failed request.
+        if (isStaleLoad()) return
         // Vite returns index.html for missing /avatar.vrm → GLTF sees "<!doctype"
         const msg = err instanceof Error ? err.message : String(err)
         console.warn(`Actor ${actorNum} load failed (${url}):`, msg)
