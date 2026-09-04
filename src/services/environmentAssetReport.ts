@@ -8,10 +8,15 @@
  *
  * .glb is the preferred format; .gltf with the same base name is the
  * acceptable fallback (an asset counts as PRESENT if either exists).
+ *
+ * Also provides registry-aware reporting (REGISTERED / AVAILABLE / MISSING)
+ * backed by the unified assetRegistry.
  */
 
 import { ENVIRONMENT_ASSET_MANIFEST, ALL_ASSET_DESCRIPTORS } from './environmentAssetLibrary'
 import type { EnvironmentAssetCategory } from './environmentAssetLibrary'
+import { getRegistry } from './assetRegistry'
+import type { AssetRegistryEntry } from './assetRegistry'
 
 export type AssetFileStatus = 'present' | 'missing'
 
@@ -79,7 +84,7 @@ export async function formatAssetChecklist(): Promise<string> {
     const entries = byCategory.get(category)
     if (!entries) continue
     lines.push('', category.toUpperCase() + ':')
-    for (const entry of entries) {
+    for (const entry of missing) {
       lines.push(`[ ] public${entry.glbUrl}`)
     }
   }
@@ -95,6 +100,83 @@ export function formatAssetReadmeDescriptions(): string {
     lines.push('', `${category.toUpperCase()}:`)
     for (const d of ENVIRONMENT_ASSET_MANIFEST[category]) {
       lines.push(`  ${d.semantic.padEnd(14)} — ${d.purpose}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Registry-aware report — distinguishes REGISTERED / AVAILABLE / MISSING
+// ---------------------------------------------------------------------------
+
+/**
+ * Three-state status for a registry entry:
+ *   - available : entry exists AND the file is confirmed present by probe
+ *   - missing   : entry exists but the file probe failed (procedural fallback)
+ *
+ * An entry is "available" ONLY when the file probe confirms it — never merely
+ * because the registry entry exists or declares itself available.
+ */
+export type RegistryFileStatus = 'available' | 'missing'
+
+export interface RegistryFileEntry {
+  id: string
+  category: string
+  semanticType: string
+  path: string
+  format: string
+  kits: string[]
+  declaredAvailable: boolean
+  status: RegistryFileStatus
+}
+
+/**
+ * Produce a registry-aware report from the live asset registry. Safe, never
+ * throws. With an empty registry this returns [].
+ */
+export async function createRegistryReport(): Promise<RegistryFileEntry[]> {
+  const registry = getRegistry()
+  return Promise.all(
+    registry.assets.map(async (entry: AssetRegistryEntry) => {
+      const status: RegistryFileStatus = (await probeFile(entry.path)) ? 'available' : 'missing'
+      return {
+        id: entry.id,
+        category: entry.category,
+        semanticType: entry.semanticType,
+        path: entry.path,
+        format: entry.format,
+        kits: [...entry.kits],
+        declaredAvailable: entry.available,
+        status,
+      }
+    })
+  )
+}
+
+/** Registry entries whose file probe failed — the procedural-fallback set. */
+export async function listRegistryMissing(): Promise<RegistryFileEntry[]> {
+  const report = await createRegistryReport()
+  return report.filter((e) => e.status === 'missing')
+}
+
+/** Human-readable registry status, grouped by category. */
+export async function formatRegistryReport(): Promise<string> {
+  const report = await createRegistryReport()
+  if (report.length === 0) {
+    return 'REGISTRY REPORT:\n(no assets registered — all environments use procedural fallback)'
+  }
+  const lines: string[] = ['REGISTRY REPORT:']
+  const byCategory = new Map<string, RegistryFileEntry[]>()
+  for (const entry of report) {
+    const arr = byCategory.get(entry.category)
+    if (arr) arr.push(entry)
+    else byCategory.set(entry.category, [entry])
+  }
+  for (const [category, entries] of byCategory) {
+    lines.push('', `${category.toUpperCase()}:`)
+    for (const e of entries) {
+      const mark = e.status === 'available' ? '[x]' : '[ ]'
+      lines.push(`  ${mark} ${e.id} (${e.semanticType}) — ${e.path}`)
     }
   }
   return lines.join('\n')
