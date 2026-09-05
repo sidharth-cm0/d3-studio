@@ -249,6 +249,19 @@ const SYNONYM_GROUPS: ReadonlyArray<ReadonlySet<string>> = [
   new Set(['barrel', 'cask', 'keg']),
   new Set(['pallet', 'skid']),
   new Set(['cargo_box', 'shipping_container', 'container']),
+  // Phase 4 asset-library expansion (conservative alias sets).
+  new Set(['streetlight', 'street_light']),
+  new Set(['trashcan', 'bin', 'trash_bin', 'garbage_can', 'dumpster']),
+  new Set(['traffic_light', 'stoplight']),
+  new Set(['sidewalk', 'pavement', 'curb']),
+  new Set(['shop', 'store', 'storefront']),
+  new Set(['pine', 'conifer']),
+  new Set(['console', 'control_panel', 'terminal_panel']),
+  new Set(['monitor', 'screen', 'display']),
+  new Set(['file_cabinet', 'drawer_cabinet', 'filing_cabinet']),
+  new Set(['bookcase', 'bookshelf']),
+  new Set(['grass', 'grass_clump', 'turf']),
+  new Set(['mushroom', 'fungus', 'toadstool']),
 ]
 
 /**

@@ -8,16 +8,29 @@
       "format": "glb",
       "category": "furniture",
       "semanticType": "sofa",
-      "tags": ["sofa", "couch", "living_room", "seat"],
-      "kits": ["living_room"],
+      "tags": [
+        "sofa",
+        "couch",
+        "living_room",
+        "seat"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 2.5,
-      "footprint": [2.5, 0.9],
+      "footprint": [
+        2.5,
+        0.9
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "interactionType": "sit",
       "collisionType": "solid",
       "lodHint": "hero",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
       "available": true
     },
     {
@@ -27,16 +40,28 @@
       "format": "glb",
       "category": "furniture",
       "semanticType": "chair",
-      "tags": ["chair", "living_room", "seat"],
-      "kits": ["living_room"],
+      "tags": [
+        "chair",
+        "living_room",
+        "seat"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 1.1,
-      "footprint": [0.5, 0.5],
+      "footprint": [
+        0.5,
+        0.5
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "interactionType": "sit",
       "collisionType": "solid",
       "lodHint": "supporting",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
       "available": true
     },
     {
@@ -46,16 +71,28 @@
       "format": "glb",
       "category": "furniture",
       "semanticType": "coffee_table",
-      "tags": ["table", "coffee_table", "living_room"],
-      "kits": ["living_room"],
+      "tags": [
+        "table",
+        "coffee_table",
+        "living_room"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 1.5,
-      "footprint": [1.2, 0.7],
+      "footprint": [
+        1.2,
+        0.7
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "interactionType": "approach",
       "collisionType": "solid",
       "lodHint": "supporting",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
       "available": true
     },
     {
@@ -65,15 +102,27 @@
       "format": "glb",
       "category": "furniture",
       "semanticType": "lamp",
-      "tags": ["lamp", "light", "living_room"],
-      "kits": ["living_room"],
+      "tags": [
+        "lamp",
+        "light",
+        "living_room"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 2.2,
-      "footprint": [0.45, 0.45],
+      "footprint": [
+        0.45,
+        0.45
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "collisionType": "solid",
       "lodHint": "dressing",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
       "available": true
     },
     {
@@ -83,16 +132,29 @@
       "format": "glb",
       "category": "furniture",
       "semanticType": "cabinet",
-      "tags": ["cabinet", "shelf", "storage", "living_room"],
-      "kits": ["living_room"],
+      "tags": [
+        "cabinet",
+        "shelf",
+        "storage",
+        "living_room"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 1.6,
-      "footprint": [1.2, 0.5],
+      "footprint": [
+        1.2,
+        0.5
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "interactionType": "approach",
       "collisionType": "solid",
       "lodHint": "supporting",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
       "available": true
     },
     {
@@ -102,15 +164,2313 @@
       "format": "glb",
       "category": "decor",
       "semanticType": "plant",
-      "tags": ["plant", "indoor_plant", "decor", "living_room"],
-      "kits": ["living_room"],
+      "tags": [
+        "plant",
+        "indoor_plant",
+        "decor",
+        "living_room"
+      ],
+      "kits": [
+        "living_room"
+      ],
       "targetScale": 1.3,
-      "footprint": [0.5, 0.5],
+      "footprint": [
+        0.5,
+        0.5
+      ],
       "orientation": "upright",
       "anchor": "ground",
       "collisionType": "solid",
       "lodHint": "dressing",
-      "environmentTags": ["living_room", "interior"],
+      "environmentTags": [
+        "living_room",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_tall",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_tall.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "pine",
+        "woodland",
+        "tall"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.0,
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_oak",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_oak.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "oak",
+        "woodland"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.2,
+      "footprint": [
+        2.1,
+        2.1
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_thin",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_thin.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "birch",
+        "thin"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.5,
+      "footprint": [
+        1.6,
+        1.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_cone",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_cone.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "conifer",
+        "pine",
+        "cone"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.4,
+      "footprint": [
+        1.9,
+        1.9
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_small",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_small.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "sapling",
+        "small"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 2.4,
+      "footprint": [
+        1.0,
+        1.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_pine_tall",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_pineTallA.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "pine",
+      "tags": [
+        "pine",
+        "conifer",
+        "tall"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 6.5,
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_pine_round",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_pineRoundA.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "pine",
+      "tags": [
+        "pine",
+        "conifer",
+        "round"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.5,
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_tree_default",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/tree_default.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "tree",
+      "tags": [
+        "tree",
+        "generic"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 5.0,
+      "footprint": [
+        2.0,
+        2.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_rock_large",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/rock_largeA.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "rock",
+      "tags": [
+        "rock",
+        "boulder",
+        "stone"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 1.0,
+      "footprint": [
+        0.9,
+        0.9
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_rock_small",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/rock_smallA.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "rock",
+      "tags": [
+        "rock",
+        "stone",
+        "small",
+        "scatter"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.5,
+      "footprint": [
+        0.45,
+        0.45
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_rock_tall",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/rock_tallA.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "rock",
+      "tags": [
+        "rock",
+        "spire",
+        "tall",
+        "stone"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 1.8,
+      "footprint": [
+        0.8,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_bush",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/plant_bush.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "bush",
+      "tags": [
+        "bush",
+        "shrub",
+        "undergrowth"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.8,
+      "footprint": [
+        0.7,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_bush_small",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/plant_bushSmall.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "bush",
+      "tags": [
+        "bush",
+        "shrub",
+        "small"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.6,
+      "footprint": [
+        0.5,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_grass",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/grass.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "grass",
+      "tags": [
+        "grass",
+        "clump",
+        "ground"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.5,
+      "footprint": [
+        0.4,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_log",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/log_large.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "log",
+      "tags": [
+        "log",
+        "fallen",
+        "wood"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 2.6,
+      "footprint": [
+        2.4,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "kenney_forest_stump",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/stump_round.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "stump",
+      "tags": [
+        "stump",
+        "wood"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.9,
+      "footprint": [
+        0.7,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_forest_mushroom",
+      "source": "kenney",
+      "path": "/assets/kenney/nature/mushroom_red.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "mushroom",
+      "tags": [
+        "mushroom",
+        "fungus",
+        "red"
+      ],
+      "kits": [
+        "forest"
+      ],
+      "targetScale": 0.35,
+      "footprint": [
+        0.25,
+        0.25
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "forest",
+        "outdoor"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_building_a",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-a.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "shop",
+        "store",
+        "storefront",
+        "facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 7.0,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_building_b",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-b.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "shop",
+        "store",
+        "storefront",
+        "facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 7.0,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_building_c",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-c.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "shop",
+        "store",
+        "storefront",
+        "facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 7.0,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_building_d",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-d.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "shop",
+        "store",
+        "storefront",
+        "facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 7.0,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_building_e",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-e.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "shop",
+        "store",
+        "storefront",
+        "facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 7.0,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_skyscraper_a",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-skyscraper-a.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "skyscraper",
+        "tower",
+        "office_facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 12.5,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_skyscraper_b",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-skyscraper-b.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "skyscraper",
+        "tower",
+        "office_facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 12.5,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_skyscraper_c",
+      "source": "kenney",
+      "path": "/assets/kenney/city/building-skyscraper-c.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "building",
+      "tags": [
+        "building",
+        "skyscraper",
+        "tower",
+        "office_facade"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 12.5,
+      "footprint": [
+        2.6,
+        2.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "urban",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_sidewalk",
+      "source": "kenney",
+      "path": "/assets/kenney/city/road-side.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "sidewalk",
+      "tags": [
+        "sidewalk",
+        "pavement",
+        "curb",
+        "tile"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 4.0,
+      "footprint": [
+        4.0,
+        1.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_road_tile",
+      "source": "kenney",
+      "path": "/assets/kenney/city/road-straight.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "road",
+      "tags": [
+        "road",
+        "street",
+        "asphalt",
+        "tile"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 4.0,
+      "footprint": [
+        4.0,
+        4.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_crossing",
+      "source": "kenney",
+      "path": "/assets/kenney/city/road-crossing.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "road",
+      "tags": [
+        "crossing",
+        "crosswalk",
+        "road",
+        "marking"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 4.0,
+      "footprint": [
+        4.0,
+        4.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_streetlamp_curved",
+      "source": "kenney",
+      "path": "/assets/kenney/city/light-curved.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "streetlight",
+      "tags": [
+        "streetlight",
+        "lamp_post",
+        "street_lamp",
+        "curved"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 4.2,
+      "footprint": [
+        0.5,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_streetlamp_square",
+      "source": "kenney",
+      "path": "/assets/kenney/city/light-square.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "streetlight",
+      "tags": [
+        "streetlight",
+        "lamp_post",
+        "street_lamp",
+        "square"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 4.0,
+      "footprint": [
+        0.5,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_traffic_light",
+      "source": "kenney",
+      "path": "/assets/kenney/city/traffic-light.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "traffic_light",
+      "tags": [
+        "traffic_light",
+        "stoplight",
+        "signal"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 3.2,
+      "footprint": [
+        0.4,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_road_sign",
+      "source": "kenney",
+      "path": "/assets/kenney/city/road-sign-street.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "sign",
+      "tags": [
+        "sign",
+        "road_sign",
+        "street_sign",
+        "signage"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 2.0,
+      "footprint": [
+        0.35,
+        0.35
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_stop_sign",
+      "source": "kenney",
+      "path": "/assets/kenney/city/road-sign-stop.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "sign",
+      "tags": [
+        "sign",
+        "stop",
+        "road_sign"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 1.8,
+      "footprint": [
+        0.35,
+        0.35
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_cone",
+      "source": "kenney",
+      "path": "/assets/kenney/city/construction-cone.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "cone",
+      "tags": [
+        "cone",
+        "traffic_cone",
+        "roadwork"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 0.5,
+      "footprint": [
+        0.3,
+        0.3
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_barrier",
+      "source": "kenney",
+      "path": "/assets/kenney/city/construction-barrier.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "barrier",
+      "tags": [
+        "barrier",
+        "roadblock",
+        "construction"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 1.2,
+      "footprint": [
+        1.1,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_fence",
+      "source": "kenney",
+      "path": "/assets/kenney/city/construction-fence.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "fence",
+      "tags": [
+        "fence",
+        "construction",
+        "panel"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 2.2,
+      "footprint": [
+        2.0,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_dumpster",
+      "source": "kenney",
+      "path": "/assets/kenney/city/dumpster.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "bin",
+      "tags": [
+        "bin",
+        "dumpster",
+        "trash",
+        "garbage"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 1.6,
+      "footprint": [
+        1.3,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "city",
+        "street"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_city_bench",
+      "source": "kenney",
+      "path": "/assets/kenney/city/bench.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "bench",
+      "tags": [
+        "bench",
+        "seat",
+        "street"
+      ],
+      "kits": [
+        "city_street"
+      ],
+      "targetScale": 1.8,
+      "footprint": [
+        1.7,
+        0.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "city",
+        "street",
+        "park"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "kenney_scifi_wall_panel",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/corridor_wall.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "panel",
+      "tags": [
+        "panel",
+        "wall",
+        "hull",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 3.0,
+      "footprint": [
+        3.0,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_window",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/corridor_window.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "panel",
+      "tags": [
+        "window",
+        "panel",
+        "hull",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 3.0,
+      "footprint": [
+        3.0,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_door",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/gate_simple.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "door",
+      "tags": [
+        "door",
+        "hatch",
+        "gate",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 2.6,
+      "footprint": [
+        1.8,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true,
+      "interactionType": "open"
+    },
+    {
+      "id": "kenney_scifi_console",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/desk_computer.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "console",
+      "tags": [
+        "console",
+        "control_panel",
+        "computer",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.4,
+      "footprint": [
+        1.2,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "kenney_scifi_screen",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/desk_computerScreen.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "screen",
+      "tags": [
+        "screen",
+        "monitor",
+        "display",
+        "terminal"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.2,
+      "footprint": [
+        1.0,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_machine",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/machine_generator.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "machine",
+      "tags": [
+        "machine",
+        "generator",
+        "reactor",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.6,
+      "footprint": [
+        1.3,
+        1.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_machine_large",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/machine_generatorLarge.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "machine",
+      "tags": [
+        "machine",
+        "generator",
+        "large",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 2.4,
+      "footprint": [
+        1.8,
+        1.2
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_wireless",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/machine_wireless.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "machine",
+      "tags": [
+        "machine",
+        "device",
+        "wireless",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.2,
+      "footprint": [
+        0.9,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_crate",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/barrels.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "crate",
+      "tags": [
+        "crate",
+        "container",
+        "barrels",
+        "storage"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.1,
+      "footprint": [
+        0.9,
+        0.9
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_barrel",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/barrel.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "barrel",
+      "tags": [
+        "barrel",
+        "container",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 0.9,
+      "footprint": [
+        0.6,
+        0.6
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_pipe",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/pipe_straight.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "pipe",
+      "tags": [
+        "pipe",
+        "conduit",
+        "straight"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.8,
+      "footprint": [
+        1.6,
+        0.3
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_pipe_corner",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/pipe_corner.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "pipe",
+      "tags": [
+        "pipe",
+        "conduit",
+        "corner"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.5,
+      "footprint": [
+        1.0,
+        1.0
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_platform",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/platform_center.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "platform",
+      "tags": [
+        "platform",
+        "floor",
+        "dais",
+        "panel"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 2.4,
+      "footprint": [
+        2.3,
+        2.3
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_pillar",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/structure_detailed.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "pillar",
+      "tags": [
+        "pillar",
+        "column",
+        "structure",
+        "support"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 3.2,
+      "footprint": [
+        0.7,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_stairs",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/stairs.glb",
+      "format": "glb",
+      "category": "architecture",
+      "semanticType": "stairs",
+      "tags": [
+        "stairs",
+        "steps"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 2.0,
+      "footprint": [
+        1.8,
+        1.2
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_crystal",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/rock_crystals.glb",
+      "format": "glb",
+      "category": "nature",
+      "semanticType": "crystal",
+      "tags": [
+        "crystal",
+        "gem",
+        "alien",
+        "decor"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 0.9,
+      "footprint": [
+        0.7,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "alien"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_scifi_dish",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/satelliteDish.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "machine",
+      "tags": [
+        "dish",
+        "antenna",
+        "comms",
+        "satellite"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 2.2,
+      "footprint": [
+        1.6,
+        1.2
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_desk",
+      "source": "kenney",
+      "path": "/assets/kenney/office/desk.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "desk",
+      "tags": [
+        "desk",
+        "workstation",
+        "table"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.9,
+      "footprint": [
+        1.6,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "kenney_office_chair_desk",
+      "source": "kenney",
+      "path": "/assets/kenney/office/chairDesk.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "chair",
+      "tags": [
+        "chair",
+        "desk_chair",
+        "office_chair",
+        "seat"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.1,
+      "footprint": [
+        0.55,
+        0.55
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "kenney_office_bookcase_closed",
+      "source": "kenney",
+      "path": "/assets/kenney/office/bookcaseClosed.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "bookshelf",
+      "tags": [
+        "bookshelf",
+        "bookcase",
+        "shelf",
+        "storage"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 2.1,
+      "footprint": [
+        1.0,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_bookcase_open",
+      "source": "kenney",
+      "path": "/assets/kenney/office/bookcaseOpen.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "bookshelf",
+      "tags": [
+        "bookshelf",
+        "bookcase",
+        "open",
+        "shelf"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 2.1,
+      "footprint": [
+        1.0,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_monitor",
+      "source": "kenney",
+      "path": "/assets/kenney/office/computerScreen.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "monitor",
+      "tags": [
+        "monitor",
+        "screen",
+        "display",
+        "computer"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.6,
+      "footprint": [
+        0.55,
+        0.25
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_keyboard",
+      "source": "kenney",
+      "path": "/assets/kenney/office/computerKeyboard.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "keyboard",
+      "tags": [
+        "keyboard",
+        "computer",
+        "desk"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.45,
+      "footprint": [
+        0.4,
+        0.15
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_file_cabinet",
+      "source": "kenney",
+      "path": "/assets/kenney/office/sideTableDrawers.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "file_cabinet",
+      "tags": [
+        "file_cabinet",
+        "drawer",
+        "cabinet",
+        "storage"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.9,
+      "footprint": [
+        0.55,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_sofa",
+      "source": "kenney",
+      "path": "/assets/kenney/office/loungeSofa.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "sofa",
+      "tags": [
+        "sofa",
+        "couch",
+        "lounge"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 2.2,
+      "footprint": [
+        2.0,
+        0.9
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "kenney_office_box",
+      "source": "kenney",
+      "path": "/assets/kenney/office/cardboardBoxClosed.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "box",
+      "tags": [
+        "box",
+        "cardboard",
+        "storage",
+        "crate"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.6,
+      "footprint": [
+        0.55,
+        0.55
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_trashcan",
+      "source": "kenney",
+      "path": "/assets/kenney/office/trashcan.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "trashcan",
+      "tags": [
+        "trashcan",
+        "bin",
+        "waste"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.5,
+      "footprint": [
+        0.4,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "kenney_office_table_round",
+      "source": "kenney",
+      "path": "/assets/kenney/office/tableRound.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "table",
+      "tags": [
+        "table",
+        "round",
+        "meeting"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.2,
+      "footprint": [
+        1.1,
+        1.1
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "kenney_office_stool",
+      "source": "kenney",
+      "path": "/assets/kenney/office/stoolBar.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "stool",
+      "tags": [
+        "stool",
+        "seat",
+        "bar"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 0.8,
+      "footprint": [
+        0.4,
+        0.4
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "kenney_office_plant",
+      "source": "kenney",
+      "path": "/assets/kenney/office/pottedPlant.glb",
+      "format": "glb",
+      "category": "decor",
+      "semanticType": "plant",
+      "tags": [
+        "plant",
+        "potted",
+        "decor"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.4,
+      "footprint": [
+        0.5,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "dressing",
+      "environmentTags": [
+        "office",
+        "interior",
+        "city_street"
+      ],
+      "available": true
+    },
+    {
+      "id": "quaternius_office_desk_01",
+      "source": "quaternius",
+      "path": "/assets/quaternius/furniture/office/office_desk_01.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "desk",
+      "tags": [
+        "desk",
+        "workstation",
+        "office"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 2.0,
+      "footprint": [
+        1.6,
+        0.8
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "quaternius_office_chair_01",
+      "source": "quaternius",
+      "path": "/assets/quaternius/furniture/office/office_chair_01.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "chair",
+      "tags": [
+        "chair",
+        "office_chair",
+        "desk_chair",
+        "seat"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.1,
+      "footprint": [
+        0.55,
+        0.55
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "hero",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "quaternius_office_cabinet_01",
+      "source": "quaternius",
+      "path": "/assets/quaternius/furniture/office/cabinet_01.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "cabinet",
+      "tags": [
+        "cabinet",
+        "storage",
+        "office"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.6,
+      "footprint": [
+        1.0,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true
+    },
+    {
+      "id": "quaternius_office_meeting_table_01",
+      "source": "quaternius",
+      "path": "/assets/quaternius/furniture/office/meeting_table_01.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "table",
+      "tags": [
+        "table",
+        "meeting",
+        "conference"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 2.0,
+      "footprint": [
+        1.8,
+        1.1
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "approach"
+    },
+    {
+      "id": "quaternius_office_meeting_chair_01",
+      "source": "quaternius",
+      "path": "/assets/quaternius/furniture/office/meeting_chair_01.glb",
+      "format": "glb",
+      "category": "furniture",
+      "semanticType": "chair",
+      "tags": [
+        "chair",
+        "meeting",
+        "seat"
+      ],
+      "kits": [
+        "modern_office"
+      ],
+      "targetScale": 1.0,
+      "footprint": [
+        0.5,
+        0.5
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "office",
+        "interior"
+      ],
+      "available": true,
+      "interactionType": "sit"
+    },
+    {
+      "id": "kenney_scifi_terminal",
+      "source": "kenney",
+      "path": "/assets/kenney/scifi/desk_computerCorner.glb",
+      "format": "glb",
+      "category": "prop",
+      "semanticType": "console",
+      "tags": [
+        "console",
+        "terminal",
+        "corner",
+        "scifi"
+      ],
+      "kits": [
+        "sci_fi_room"
+      ],
+      "targetScale": 1.3,
+      "footprint": [
+        1.1,
+        0.7
+      ],
+      "orientation": "upright",
+      "anchor": "ground",
+      "collisionType": "solid",
+      "lodHint": "supporting",
+      "environmentTags": [
+        "scifi",
+        "spaceship"
+      ],
       "available": true
     }
   ]

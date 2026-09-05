@@ -139,6 +139,13 @@ async function attachAssetOverlays(
         if (!clone || !src) return
         clone.position.copy(src.position)
         clone.rotation.copy(src.rotation)
+        // Floor-align: real GLB files may have their origin at the model
+        // center rather than the base. Align the clone's bounding-box min-Y
+        // to the procedural prop's bounding-box min-Y so the asset sits
+        // exactly where the fallback prop stood (never buried / floating).
+        const srcBox = new THREE.Box3().setFromObject(src)
+        const cloneBox = new THREE.Box3().setFromObject(clone)
+        clone.position.y += srcBox.min.y - cloneBox.min.y
         src.visible = false
         src.parent?.add(clone)
       })
@@ -228,6 +235,8 @@ function composeForest(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
   ctx.group.add(buildDirtPath(ctx))
 
   const treeCount = countIn(bp.props, 'tree')
+  // Real-asset tree variety: 4 registered Kenney nature-kit GLB variants.
+  const TREE_SLOTS: SemanticAssetId[] = ['tree_01', 'tree_02', 'tree_03', 'tree_04']
 
   // --- MIDGROUND hero trees (individual Groups, asset-slot tagged) ---------
   // Frame-edge + mid rows; positions get seeded jitter for organic clusters.
@@ -248,7 +257,7 @@ function composeForest(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
     const tree = buildTree(ctx, scale + (ctx.rng() - 0.5) * 0.2)
     tree.position.set(tx, 0, tz)
     tree.rotation.y = ctx.rng() * Math.PI * 2
-    tagAssetSlot(tree, i % 2 === 0 ? 'tree_01' : 'tree_02')
+    tagAssetSlot(tree, TREE_SLOTS[i % TREE_SLOTS.length])
     ctx.group.add(tree)
     registerFootprint(ctx, tx, tz, 0.9 * scale)
   }
@@ -260,7 +269,7 @@ function composeForest(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
     const pos = placeInZone(ctx, 0.9, ctx.rng() > 0.5 ? ZONES.sideL : ZONES.sideR)
     const tree = buildTree(ctx, 1.2 + ctx.rng() * 0.4)
     tree.position.set(pos.x, 0, pos.z)
-    tagAssetSlot(tree, extraTrees % 2 === 0 ? 'tree_01' : 'tree_02')
+    tagAssetSlot(tree, TREE_SLOTS[extraTrees % TREE_SLOTS.length])
     ctx.group.add(tree)
     extraTrees--
   }
@@ -388,6 +397,7 @@ function composeForest(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
   log.rotation.y = 0.65 + ctx.rng() * 0.4
   log.matrixAutoUpdate = false
   log.updateMatrix()
+  tagAssetSlot(log, 'log')
   ctx.group.add(log)
   registerFootprint(ctx, -3.5, -1.6, 1.2)
   recordProp(ctx, 'fallen_log')
@@ -1101,7 +1111,8 @@ function composeStreet(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
   for (let i = 0; i < sidewalkCount; i++) {
     const sw = buildSidewalk(ctx, 24)
     sw.position.set(i % 2 === 0 ? -4.35 : 4.35, 0.12, -2.5)
-    tagAssetSlot(sw, 'sidewalk')
+    // Sidewalks stay PROCEDURAL (hybrid city): the registered 'sidewalk' GLB
+    // is a single small tile — overlaying it onto a 24 m strip would gap.
     ctx.group.add(sw)
   }
 
@@ -1127,7 +1138,12 @@ function composeStreet(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
       !ctx.details.abandoned || i % 2 === 0
     )
     b.position.set(sx, 0, z)
-    tagAssetSlot(b, 'building')
+    // Real-asset building variety: 8 registered Kenney city-kit GLB variants.
+    const BUILDING_SLOTS: SemanticAssetId[] = [
+      'building_a', 'building_b', 'building_c', 'building_d', 'building_e',
+      'skyscraper_a', 'skyscraper_b', 'skyscraper_c',
+    ]
+    tagAssetSlot(b, BUILDING_SLOTS[i % BUILDING_SLOTS.length])
     ctx.group.add(b)
     registerFootprint(ctx, sx, z, 1.8)
   }
@@ -1175,8 +1191,188 @@ function composeStreet(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
     const fence = buildFence(ctx)
     fence.position.set(pos.x, 0.13, pos.z)
     fence.rotation.y = ctx.rng() > 0.5 ? 0 : Math.PI / 2
+    tagAssetSlot(fence, 'fence_kit')
     ctx.group.add(fence)
   }
+
+  // Real street props (Kenney city-kit slots) — sidewalk edges only, actor
+  // zone and camera sightline stay clear. Deterministic seeded placement.
+  const propSpots: Array<{ x: number; z: number; slot: SemanticAssetId; ry: number }> = [
+    { x: -3.6, z: -2.0, slot: 'bin', ry: 0.2 },
+    { x: 3.7, z: -1.4, slot: 'cone', ry: 0 },
+    { x: 3.9, z: -2.6, slot: 'barrier', ry: 0.35 },
+    { x: -4.1, z: -4.9, slot: 'traffic_light', ry: Math.PI / 2 },
+    { x: 4.0, z: -6.4, slot: 'road_sign', ry: Math.PI },
+    { x: -4.5, z: -0.7, slot: 'stop_sign', ry: 0 },
+  ]
+  for (const p of propSpots) {
+    const prop = newProp('city_prop')
+    prop.position.set(p.x, 0.13, p.z)
+    prop.rotation.y = p.ry
+    tagAssetSlot(prop, p.slot)
+    ctx.group.add(prop)
+    registerFootprint(ctx, p.x, p.z, 0.45)
+    recordProp(ctx, `street_${p.slot}`)
+  }
+
+  // Street trees on the sidewalk edges (real GLB via the shared forest slots
+  // is WRONG category — city registers its own tree slot through 'lamp' pair
+  // below; procedural tree keeps the fallback look until a city tree GLB is
+  // registered).
+  const cityTreeSpots: Array<[number, number]> = [[-4.6, -3.4], [4.6, -5.2]]
+  for (const [tx, tz] of cityTreeSpots) {
+    const tree = buildTree(ctx, 1.1)
+    tree.position.set(tx, 0.12, tz)
+    tree.rotation.y = ctx.rng() * Math.PI * 2
+    ctx.group.add(tree)
+    registerFootprint(ctx, tx, tz, 0.6)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SCI-FI COMPOSER — spaceship room: hull shell, consoles, machinery, crates
+// ---------------------------------------------------------------------------
+
+function composeScifi(ctx: Ctx, bp: ResolvedEnvironment['blueprint']): void {
+  // Dark deck floor + hull shell OPEN toward the camera (film-set layout
+  // shared with the interior composer — actor zone and sightline stay clear).
+  ctx.group.add(buildFloorMesh(ctx, 22, ctx.palette.ground, 0.85))
+
+  const back = buildWall(ctx, 18, 4.8, 0.4, ctx.palette.wall)
+  back.position.set(0, 0, -7.4)
+  ctx.group.add(back)
+  registerOccluder(ctx, 0, -7.4, 18, 4.8)
+
+  for (const sx of [-5.4, 5.4]) {
+    const side = buildSidePanel(ctx, 8.4, 4.2, 0.3, sx < 0 ? 0x39414f : 0x333b48)
+    side.position.set(sx, 0, -4.4)
+    ctx.group.add(side)
+    registerOccluder(ctx, sx, -4.4, 0.3, 4.2)
+  }
+
+  // Cyan emissive accent strips (hull glow) — procedural, always visible.
+  const stripMat = ctx.mats.get(0x05070c, {
+    rough: 0.4,
+    emissive: ctx.palette.accent,
+    emissiveIntensity: ctx.night ? 1.6 : 1.0,
+  })
+  for (const sz of [-2.2, -5.2]) {
+    ctx.group.add(bx(ctx, 14, 0.08, 0.06, stripMat, 0, 2.6, -7.15))
+  }
+  for (const sx of [-5.2, 5.2]) {
+    ctx.group.add(bx(ctx, 0.06, 0.5, 6, stripMat, sx, 2.9, -4.4))
+  }
+
+  // Rear-wall dressing: technical panel + window slots + pipe runs.
+  const panelA = bx(ctx, 1.8, 2.2, 0.12, ctx.mats.get(ctx.palette.secondary, { rough: 0.6, metal: 0.4 }), -1.2, 1.5, -7.1)
+  tagAssetSlot(panelA, 'scifi_wall_panel')
+  ctx.group.add(panelA)
+  recordProp(ctx, 'scifi_wall_panel')
+  const panelB = bx(ctx, 1.8, 2.2, 0.12, ctx.mats.get(ctx.palette.secondary, { rough: 0.6, metal: 0.4 }), 0.6, 1.5, -7.1)
+  tagAssetSlot(panelB, 'scifi_window')
+  ctx.group.add(panelB)
+  recordProp(ctx, 'scifi_window')
+
+  for (const py of [3.1, 3.4]) {
+    const pipe = buildPipe(ctx, 12, 0x4a5568)
+    pipe.position.set(0, py, -7.05)
+    ctx.group.add(pipe)
+  }
+
+  // Door / hatch (real asset slot) — off-center on the rear wall.
+  const door = buildDoorway(ctx)
+  door.position.set(3.2, 0, -7.2)
+  tagAssetSlot(door, 'scifi_door')
+  ctx.group.add(door)
+  recordProp(ctx, 'scifi_door')
+
+  // Console zone (LEFT midground) — consoles + terminals + procedural glow.
+  const consoleCount = Math.max(1, countIn(bp.props, 'desk'))
+  const consoleSpots: Array<[number, number, number]> = [
+    [-2.8, -3.2, 0.35],
+    [-4.1, -4.6, 0.1],
+    [-1.6, -4.8, 0.6],
+  ]
+  for (let i = 0; i < Math.min(consoleCount + 1, consoleSpots.length); i++) {
+    const [cx, cz, cry] = consoleSpots[i]
+    const consoleObj =
+      i % 2 === 0
+        ? buildDesk(ctx, 1.6)
+        : buildTable(ctx, 1.1, 0.5, 0.9, ctx.palette.primary)
+    consoleObj.position.set(cx, 0, cz)
+    consoleObj.rotation.y = cry
+    tagAssetSlot(consoleObj, i % 3 === 0 ? 'scifi_console' : 'scifi_terminal')
+    ctx.group.add(consoleObj)
+    registerFootprint(ctx, cx, cz, 0.7)
+    ctx.group.add(
+      mkMesh(
+        ctx,
+        ctx.geos.plane(0.7, 0.45),
+        ctx.mats.get(0x05070c, { rough: 0.3, emissive: ctx.palette.accent, emissiveIntensity: 1.2 }),
+        cx,
+        1.15,
+        cz
+      )
+    )
+    recordProp(ctx, 'scifi_console')
+  }
+
+  // Machinery row (RIGHT rear) — generators.
+  const machineSpots: Array<[number, number]> = [
+    [4.0, -5.6],
+    [2.6, -6.3],
+  ]
+  machineSpots.forEach(([mx, mz], i) => {
+    const m = bx(ctx, 1.2, 1.4, 1.0, ctx.mats.get(ctx.palette.primary, { rough: 0.5, metal: 0.5 }), mx, 0.7, mz)
+    tagAssetSlot(m, i === 0 ? 'scifi_machine' : 'scifi_machine_large')
+    ctx.group.add(m)
+    registerFootprint(ctx, mx, mz, 0.8)
+    recordProp(ctx, 'scifi_machine')
+  })
+
+  // Storage zone: crates + barrels at the side margins (seeded jitter).
+  const crateReq = countIn(bp.props, 'crate')
+  const crateSpots: Array<[number, number]> = [
+    [-4.3, -1.9],
+    [4.3, -2.1],
+    [-3.6, -5.9],
+    [3.9, -4.2],
+  ]
+  for (let i = 0; i < Math.min(Math.max(crateReq, 2), crateSpots.length); i++) {
+    const [kx, kz] = crateSpots[i]
+    const s = 0.7 + ctx.rng() * 0.25
+    const crate = bx(ctx, s, s, s, ctx.mats.get(0x4a5568, { rough: 0.6, metal: 0.4 }), kx, s / 2, kz)
+    crate.rotation.y = ctx.rng() * 0.6
+    tagAssetSlot(crate, i % 2 === 0 ? 'scifi_crate' : 'scifi_barrel')
+    ctx.group.add(crate)
+    registerFootprint(ctx, kx, kz, 0.6)
+    recordProp(ctx, 'scifi_crate')
+  }
+
+  // Structural pillars (frame-edge pair).
+  const pillarReq = countIn(bp.props, 'pillar')
+  for (let i = 0; i < Math.min(pillarReq, 2); i++) {
+    const px = i === 0 ? -3.4 : 3.4
+    const pillar = bx(ctx, 0.5, 3.6, 0.5, ctx.mats.get(ctx.palette.secondary, { rough: 0.5, metal: 0.55 }), px, 1.8, -5.6)
+    tagAssetSlot(pillar, 'scifi_pillar')
+    ctx.group.add(pillar)
+    registerFootprint(ctx, px, -5.6, 0.45)
+    recordProp(ctx, 'scifi_pillar')
+  }
+
+  // Comms dish — deep background silhouette on the right.
+  const dish = bx(ctx, 0.8, 1.8, 0.8, ctx.mats.get(ctx.palette.primary, { rough: 0.6, metal: 0.5 }), 4.6, 0.9, -6.7)
+  tagAssetSlot(dish, 'scifi_dish')
+  ctx.group.add(dish)
+  registerFootprint(ctx, 4.6, -6.7, 0.6)
+  recordProp(ctx, 'scifi_dish')
+
+  // Raised platform dais at the left frame edge (asset slot).
+  const dais = bx(ctx, 2.4, 0.22, 2.4, ctx.mats.get(ctx.palette.secondary, { rough: 0.7, metal: 0.4 }), -4.2, 0.11, -3.4)
+  tagAssetSlot(dais, 'scifi_platform')
+  ctx.group.add(dais)
+  registerFootprint(ctx, -4.2, -3.4, 1.3)
+  recordProp(ctx, 'scifi_platform')
 }
 
 // ---------------------------------------------------------------------------
@@ -1201,6 +1397,7 @@ const COMPOSERS: Partial<Record<ResolvedEnvironment['locationKind'], Composer>> 
   broadcast: composeBroadcast,
   street: composeStreet,
   forest: composeForest,
+  scifi: composeScifi,
 }
 
 // ---------------------------------------------------------------------------

@@ -47,6 +47,7 @@ export type EnvironmentLocationKind =
   | 'interior'
   | 'street'
   | 'forest'
+  | 'scifi'
 
 /** Mood drives the lighting grade (time-of-day + emotional keywords). */
 export type EnvironmentMood =
@@ -207,6 +208,7 @@ function mulberry32(seed: number): () => number {
 // ---------------------------------------------------------------------------
 
 const LOCATION_KIND_RULES: Array<{ keys: RegExp; kind: EnvironmentLocationKind }> = [
+  { keys: /(sci-?\s?fi|spaceship|space\s?ship|starship|space\s?station|spacecraft|futuristic|space\s?port|hologram|cryo|reactor\s?room|alien\s?ship)/, kind: 'scifi' },
   { keys: /(news|broadcast|newsroom|anchor|television|\btv\b|press\s?room|talk\s?show)/, kind: 'broadcast' },
   { keys: /(railway|rail\s?yard|train\s?station|\bstation\b|platform|subway|metro|underground|tram|tunnel)/, kind: 'railway' },
   { keys: /(warehouse|depot|storage|factory|industrial|dock|hangar|freight|cargo|foundry|\bmill\b)/, kind: 'warehouse' },
@@ -221,13 +223,13 @@ const LOCATION_KIND_RULES: Array<{ keys: RegExp; kind: EnvironmentLocationKind }
 const KIND_PRESET: Record<EnvironmentLocationKind, D3StagePresetId | 'fallback'> = {
   stage: 'fallback', broadcast: 'broadcast', railway: 'minimal', warehouse: 'cyberpunk',
   apartment: 'minimal', office: 'minimal', alley: 'cyberpunk', interior: 'fallback',
-  street: 'cyberpunk', forest: 'minimal',
+  street: 'cyberpunk', forest: 'minimal', scifi: 'minimal',
 }
 
 const KIND_DEFAULT_MOOD: Record<EnvironmentLocationKind, EnvironmentMood> = {
   stage: 'neutral', broadcast: 'bright', railway: 'night', warehouse: 'night',
   apartment: 'soft', office: 'neutral', alley: 'night', interior: 'neutral',
-  street: 'night', forest: 'dawn',
+  street: 'night', forest: 'dawn', scifi: 'tension',
 }
 
 const MOOD_RULES: Array<{ keys: RegExp; mood: EnvironmentMood }> = [
@@ -332,6 +334,9 @@ const CATEGORY_TEMPLATES: Record<ComposableKind, CategoryTemplate> = {
   forest: { layout: 'forest_clearing', props: [
     { type: 'tree', count: 12 }, { type: 'rock', count: 6 },
   ]},
+  scifi: { layout: 'spaceship_room_interior', props: [
+    { type: 'desk', count: 2 }, { type: 'screen', count: 1 }, { type: 'crate', count: 4 }, { type: 'pillar', count: 2 }, { type: 'doorway', count: 1 },
+  ]},
 }
 
 function scaleCounts(props: BlueprintPropRequest[], scale: number): BlueprintPropRequest[] {
@@ -347,6 +352,7 @@ const CATEGORY_PALETTES: Record<ComposableKind, PaletteSpec> = {
   interior: { primary: 0x2b303c, secondary: 0x39404d, accent: 0x453b33, ground: 0x23262e, wall: 0x2b303c },
   street: { primary: 0x181b23, secondary: 0x2b2d33, accent: 0x22262c, ground: 0x14151a, wall: 0x181b23 },
   forest: { primary: 0x27603a, secondary: 0x1d3a24, accent: 0x4a3c2e, ground: 0x21402c, wall: 0x1d3a24 },
+  scifi: { primary: 0x39414f, secondary: 0x2a313c, accent: 0x67e8f9, ground: 0x1d222b, wall: 0x333b48 },
 }
 
 function blueprintNight(mood: EnvironmentMood): boolean {
@@ -363,6 +369,7 @@ function deriveLightRequests(kind: ComposableKind, details: EnvironmentDetails, 
     case 'office': return [{ kind: 'hanging', count: 2, lit }]
     case 'street': return [{ kind: 'street', count: details.abandoned ? 1 : 3, lit }]
     case 'forest': return []
+    case 'scifi': return [{ kind: 'screen_glow', count: 2, lit }]
   }
 }
 
