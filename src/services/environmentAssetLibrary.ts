@@ -32,6 +32,7 @@ export type EnvironmentAssetCategory =
   | 'studio'
   | 'city'
   | 'living_room'
+  | 'office'
 
 export type SemanticAssetId =
   // warehouse
@@ -69,6 +70,8 @@ export type SemanticAssetId =
   | 'bench'
   // living_room
   | 'plant'
+  // office
+  | 'meeting_chair'
 
 // ---------------------------------------------------------------------------
 // Descriptor
@@ -409,6 +412,62 @@ export const ENVIRONMENT_ASSET_MANIFEST: Readonly<
       footprintRadius: 0.5,
     },
   ],
+  office: [
+    {
+      semantic: 'desk',
+      category: 'office',
+      url: '/assets/quaternius/furniture/office/office_desk_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/office/office_desk_01.gltf',
+      purpose: 'Quaternius office desk (CC0).',
+      targetScale: 2.0,
+      footprintRadius: 1.0,
+    },
+    {
+      semantic: 'chair',
+      category: 'office',
+      url: '/assets/quaternius/furniture/office/office_chair_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/office/office_chair_01.gltf',
+      purpose: 'Quaternius office chair (CC0).',
+      targetScale: 1.1,
+      footprintRadius: 0.55,
+    },
+    {
+      semantic: 'cabinet',
+      category: 'office',
+      url: '/assets/quaternius/furniture/office/cabinet_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/office/cabinet_01.gltf',
+      purpose: 'Quaternius office cabinet (CC0).',
+      targetScale: 1.6,
+      footprintRadius: 0.7,
+    },
+    {
+      semantic: 'table',
+      category: 'office',
+      url: '/assets/quaternius/furniture/office/meeting_table_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/office/meeting_table_01.gltf',
+      purpose: 'Quaternius meeting table (CC0).',
+      targetScale: 2.0,
+      footprintRadius: 1.2,
+    },
+    {
+      semantic: 'meeting_chair',
+      category: 'office',
+      url: '/assets/quaternius/furniture/office/meeting_chair_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/office/meeting_chair_01.gltf',
+      purpose: 'Quaternius meeting chair (CC0).',
+      targetScale: 1.0,
+      footprintRadius: 0.5,
+    },
+    {
+      semantic: 'plant',
+      category: 'office',
+      url: '/assets/quaternius/furniture/living_room/plant_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/plant_01.gltf',
+      purpose: 'Quaternius indoor plant (CC0) — reused in office.',
+      targetScale: 1.3,
+      footprintRadius: 0.5,
+    },
+  ],
 }
 
 // ---------------------------------------------------------------------------
@@ -441,12 +500,17 @@ export function assetCategoryForLocation(
       return 'railway'
     case 'apartment':
     case 'interior':
-      return 'apartment'
+      // Living-room kit assets live in the 'living_room' category (Quaternius
+      // CC0 furniture). The 'apartment' category files do not exist locally.
+      return 'living_room'
     case 'forest':
       return 'forest'
     case 'broadcast':
-    case 'office':
       return 'studio'
+    case 'office':
+      // Modern-office kit assets live in the 'office' category (Quaternius
+      // CC0 office furniture). The 'studio' category files do not exist locally.
+      return 'office'
     case 'street':
       return 'city'
     default:
