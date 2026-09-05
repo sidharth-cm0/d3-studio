@@ -31,6 +31,7 @@ export type EnvironmentAssetCategory =
   | 'forest'
   | 'studio'
   | 'city'
+  | 'living_room'
 
 export type SemanticAssetId =
   // warehouse
@@ -66,6 +67,8 @@ export type SemanticAssetId =
   | 'sidewalk'
   | 'lamp'
   | 'bench'
+  // living_room
+  | 'plant'
 
 // ---------------------------------------------------------------------------
 // Descriptor
@@ -348,6 +351,62 @@ export const ENVIRONMENT_ASSET_MANIFEST: Readonly<
       purpose: 'Public street bench on the sidewalk.',
       targetScale: 1.7,
       footprintRadius: 0.9,
+    },
+  ],
+  living_room: [
+    {
+      semantic: 'sofa',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/sofa_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/sofa_01.gltf',
+      purpose: 'Quaternius living-room sofa (CC0).',
+      targetScale: 2.5,
+      footprintRadius: 1.2,
+    },
+    {
+      semantic: 'chair',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/chair_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/chair_01.gltf',
+      purpose: 'Quaternius living-room chair (CC0).',
+      targetScale: 1.1,
+      footprintRadius: 0.55,
+    },
+    {
+      semantic: 'table',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/coffee_table_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/coffee_table_01.gltf',
+      purpose: 'Quaternius coffee table (CC0).',
+      targetScale: 1.5,
+      footprintRadius: 0.7,
+    },
+    {
+      semantic: 'lamp',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/lamp_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/lamp_01.gltf',
+      purpose: 'Quaternius living-room lamp (CC0).',
+      targetScale: 2.2,
+      footprintRadius: 0.45,
+    },
+    {
+      semantic: 'cabinet',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/cabinet_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/cabinet_01.gltf',
+      purpose: 'Quaternius living-room cabinet (CC0).',
+      targetScale: 1.6,
+      footprintRadius: 0.7,
+    },
+    {
+      semantic: 'plant',
+      category: 'living_room',
+      url: '/assets/quaternius/furniture/living_room/plant_01.glb',
+      gltfUrl: '/assets/quaternius/furniture/living_room/plant_01.gltf',
+      purpose: 'Quaternius indoor plant (CC0).',
+      targetScale: 1.3,
+      footprintRadius: 0.5,
     },
   ],
 }

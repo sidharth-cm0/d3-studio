@@ -1,0 +1,505 @@
+/**
+ * Deterministic text-to-CharacterSpec parser.
+ *
+ * Converts natural-language character descriptions into structured
+ * CharacterSpec objects suitable for remote procedural generation.
+ *
+ * This parser is intentionally rule-based (no ML/AI) so that it is
+ * deterministic, testable, and runs entirely client-side.
+ */
+
+import {
+  CharacterSpec,
+  Gender,
+  AgeCategory,
+  BodyBuild,
+  HeightCategory,
+  HairStyle,
+  HairColor,
+  SkinTone,
+  createEmptyCharacterSpec,
+} from './characterSpec';
+
+// ---------------------------------------------------------------------------
+// Keyword tables
+// ---------------------------------------------------------------------------
+
+const GENDER_KEYWORDS: Record<string, Gender> = {
+  male: 'male',
+  man: 'male',
+  boy: 'male',
+  gentleman: 'male',
+  guy: 'male',
+  sir: 'male',
+  father: 'male',
+  dad: 'male',
+  husband: 'male',
+  brother: 'male',
+  son: 'male',
+  uncle: 'male',
+  grandfather: 'male',
+  king: 'male',
+  prince: 'male',
+  lord: 'male',
+  female: 'female',
+  woman: 'female',
+  girl: 'female',
+  lady: 'female',
+  madam: 'female',
+  mother: 'female',
+  mom: 'female',
+  wife: 'female',
+  sister: 'female',
+  daughter: 'female',
+  aunt: 'female',
+  grandmother: 'female',
+  queen: 'female',
+  princess: 'female',
+};
+
+const AGE_CATEGORY_KEYWORDS: Record<string, AgeCategory> = {
+  infant: 'infant',
+  baby: 'infant',
+  toddler: 'infant',
+  child: 'child',
+  kid: 'child',
+  little: 'child',
+  small: 'child',
+  teenager: 'teenager',
+  teen: 'teenager',
+  adolescent: 'teenager',
+  young: 'young_adult',
+  youth: 'young_adult',
+  adult: 'adult',
+  middle_aged: 'middle_aged',
+  middle: 'middle_aged',
+  senior: 'senior',
+  old: 'elderly',
+  elderly: 'elderly',
+  aged: 'elderly',
+  ancient: 'elderly',
+};
+
+const BODY_BUILD_KEYWORDS: Record<string, BodyBuild> = {
+  slim: 'slim',
+  thin: 'slim',
+  skinny: 'slim',
+  lean: 'slim',
+  lanky: 'slim',
+  athletic: 'athletic',
+  fit: 'athletic',
+  muscular: 'athletic',
+  sporty: 'athletic',
+  average: 'average',
+  normal: 'average',
+  stocky: 'stocky',
+  heavy: 'heavy',
+  large: 'heavy',
+  big: 'heavy',
+  overweight: 'heavy',
+  obese: 'heavy',
+  bulky: 'heavy',
+};
+
+const HEIGHT_KEYWORDS: Record<string, HeightCategory> = {
+  short: 'short',
+  petite: 'short',
+  below_average: 'below_average',
+  average: 'average',
+  medium: 'average',
+  above_average: 'above_average',
+  tall: 'tall',
+  towering: 'tall',
+};
+
+const HAIR_STYLE_KEYWORDS: Record<string, HairStyle> = {
+  bald: 'bald',
+  buzzcut: 'buzzcut',
+  buzz: 'buzzcut',
+  short: 'short',
+  medium: 'medium',
+  long: 'long',
+  ponytail: 'ponytail',
+  bun: 'bun',
+  braided: 'braided',
+  braid: 'braided',
+  curly: 'curly',
+  wavy: 'wavy',
+  afro: 'afro',
+  mohawk: 'mohawk',
+};
+
+const HAIR_COLOR_KEYWORDS: Record<string, HairColor> = {
+  black: 'black',
+  dark_brown: 'dark_brown',
+  'dark brown': 'dark_brown',
+  brown: 'brown',
+  light_brown: 'light_brown',
+  'light brown': 'light_brown',
+  auburn: 'auburn',
+  red: 'red',
+  strawberry_blonde: 'strawberry_blonde',
+  'strawberry blonde': 'strawberry_blonde',
+  blonde: 'blonde',
+  platinum: 'platinum',
+  gray: 'gray',
+  grey: 'gray',
+  white: 'white',
+  blue: 'blue',
+  pink: 'pink',
+  purple: 'purple',
+  green: 'green',
+};
+
+const SKIN_TONE_KEYWORDS: Record<string, SkinTone> = {
+  very_light: 'very_light',
+  'very light': 'very_light',
+  pale: 'very_light',
+  light: 'light',
+  fair: 'light',
+  medium_light: 'medium_light',
+  'medium light': 'medium_light',
+  medium: 'medium',
+  olive: 'medium',
+  medium_dark: 'medium_dark',
+  'medium dark': 'medium_dark',
+  tan: 'medium_dark',
+  dark: 'dark',
+  brown: 'dark',
+  very_dark: 'very_dark',
+  'very dark': 'very_dark',
+};
+
+const OCCUPATION_KEYWORDS: Record<string, string> = {
+  police: 'police_officer',
+  officer: 'police_officer',
+  policeman: 'police_officer',
+  policewoman: 'police_officer',
+  cop: 'police_officer',
+  detective: 'detective',
+  firefighter: 'firefighter',
+  fireman: 'firefighter',
+  firewoman: 'firefighter',
+  doctor: 'doctor',
+  physician: 'doctor',
+  surgeon: 'doctor',
+  nurse: 'nurse',
+  soldier: 'soldier',
+  military: 'soldier',
+  army: 'soldier',
+  warrior: 'warrior',
+  knight: 'knight',
+  king: 'king',
+  queen: 'queen',
+  prince: 'prince',
+  princess: 'princess',
+  teacher: 'teacher',
+  professor: 'teacher',
+  chef: 'chef',
+  cook: 'chef',
+  waiter: 'waiter',
+  waitress: 'waiter',
+  pilot: 'pilot',
+  driver: 'driver',
+  lawyer: 'lawyer',
+  attorney: 'lawyer',
+  judge: 'judge',
+  scientist: 'scientist',
+  engineer: 'engineer',
+  programmer: 'programmer',
+  developer: 'programmer',
+  artist: 'artist',
+  musician: 'musician',
+  singer: 'singer',
+  actor: 'actor',
+  dancer: 'dancer',
+  athlete: 'athlete',
+  student: 'student',
+  priest: 'priest',
+  monk: 'monk',
+  farmer: 'farmer',
+  worker: 'worker',
+  mechanic: 'mechanic',
+  electrician: 'electrician',
+  plumber: 'plumber',
+  carpenter: 'carpenter',
+  security: 'security_guard',
+  guard: 'security_guard',
+  spy: 'spy',
+  agent: 'agent',
+  thief: 'thief',
+  criminal: 'criminal',
+  prisoner: 'prisoner',
+  prisoner: 'prisoner',
+  civilian: 'civilian',
+};
+
+const CLOTHING_KEYWORDS: Record<string, { category: string; description: string }> = {
+  suit: { category: 'suit', description: 'business suit' },
+  tuxedo: { category: 'suit', description: 'tuxedo' },
+  uniform: { category: 'uniform', description: 'uniform' },
+  armor: { category: 'armor', description: 'armor' },
+  robe: { category: 'robe', description: 'robe' },
+  gown: { category: 'gown', description: 'gown' },
+  dress: { category: 'dress', description: 'dress' },
+  skirt: { category: 'skirt', description: 'skirt' },
+  jeans: { category: 'casual', description: 'jeans' },
+  tshirt: { category: 'casual', description: 't-shirt' },
+  't-shirt': { category: 'casual', description: 't-shirt' },
+  hoodie: { category: 'casual', description: 'hoodie' },
+  jacket: { category: 'outerwear', description: 'jacket' },
+  coat: { category: 'outerwear', description: 'coat' },
+  cape: { category: 'outerwear', description: 'cape' },
+  scrubs: { category: 'medical', description: 'medical scrubs' },
+  labcoat: { category: 'medical', description: 'lab coat' },
+  'lab coat': { category: 'medical', description: 'lab coat' },
+};
+
+const ACCESSORY_KEYWORDS: Record<string, string> = {
+  glasses: 'glasses',
+  sunglasses: 'sunglasses',
+  hat: 'hat',
+  cap: 'cap',
+  helmet: 'helmet',
+  watch: 'watch',
+  badge: 'badge',
+  tie: 'tie',
+  bowtie: 'bowtie',
+  bowtie: 'bowtie',
+  scarf: 'scarf',
+  gloves: 'gloves',
+  belt: 'belt',
+  backpack: 'backpack',
+  bag: 'bag',
+  earrings: 'earrings',
+  necklace: 'necklace',
+  ring: 'ring',
+  bracelet: 'bracelet',
+  crown: 'crown',
+  tiara: 'tiara',
+  mask: 'mask',
+  cane: 'cane',
+  crutches: 'crutches',
+  wheelchair: 'wheelchair',
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function uid(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+/**
+ * Extract a numeric age from text like "65 year old" or "age 30".
+ */
+function extractNumericAge(text: string): number | null {
+  const patterns = [
+    /(\d+)\s*(?:year|yr)s?\s*old/i,
+    /age[ds]?\s*(\d+)/i,
+    /aged\s*(\d+)/i,
+    /(\d+)\s*(?:year|yr)s?\s*of\s*age/i,
+  ];
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match) {
+      const age = parseInt(match[1], 10);
+      if (!isNaN(age) && age >= 0 && age <= 200) {
+        return age;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Map a numeric age to an AgeCategory.
+ */
+function ageToCategory(age: number): AgeCategory {
+  if (age <= 2) return 'infant';
+  if (age <= 12) return 'child';
+  if (age <= 17) return 'teenager';
+  if (age <= 25) return 'young_adult';
+  if (age <= 45) return 'adult';
+  if (age <= 60) return 'middle_aged';
+  if (age <= 75) return 'senior';
+  return 'elderly';
+}
+
+/**
+ * Tokenize input text into lowercase word tokens.
+ */
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s'-]/g, ' ')
+    .split(/\s+/)
+    .filter(t => t.length > 0);
+}
+
+/**
+ * Find the first matching keyword in a token list.
+ */
+function findKeyword<T extends string>(
+  tokens: string[],
+  keywordMap: Record<string, T>,
+): T | null {
+  // Try multi-word phrases first (sort by length descending)
+  const phrases = Object.keys(keywordMap)
+    .filter(k => k.includes(' '))
+    .sort((a, b) => b.length - a.length);
+
+  const lowerText = tokens.join(' ');
+  for (const phrase of phrases) {
+    if (lowerText.includes(phrase)) {
+      return keywordMap[phrase];
+    }
+  }
+
+  // Then try single-word matches
+  for (const token of tokens) {
+    if (keywordMap[token]) {
+      return keywordMap[token];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find all matching keywords in a token list.
+ */
+function findAllKeywords<T extends string>(
+  tokens: string[],
+  keywordMap: Record<string, T>,
+): T[] {
+  const found: T[] = [];
+  const lowerText = tokens.join(' ');
+
+  // Multi-word phrases first
+  const phrases = Object.keys(keywordMap)
+    .filter(k => k.includes(' '))
+    .sort((a, b) => b.length - a.length);
+
+  for (const phrase of phrases) {
+    if (lowerText.includes(phrase)) {
+      const val = keywordMap[phrase];
+      if (!found.includes(val)) {
+        found.push(val);
+      }
+    }
+  }
+
+  // Single-word matches
+  for (const token of tokens) {
+    if (keywordMap[token]) {
+      const val = keywordMap[token];
+      if (!found.includes(val)) {
+        found.push(val);
+      }
+    }
+  }
+
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// Main parser
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a natural-language character description into a CharacterSpec.
+ *
+ * Examples:
+ *   "A 65 year old male police officer"
+ *   → male, age 65 (elderly), police_officer
+ *
+ *   "A young woman firefighter"
+ *   → female, young_adult, firefighter
+ *
+ *   "An old man wearing a suit"
+ *   → male, elderly, suit
+ *
+ *   "A little boy"
+ *   → male, child
+ *
+ *   "A teenage girl with long black hair"
+ *   → female, teenager, long hair, black hair
+ */
+export function parseCharacterPrompt(prompt: string): CharacterSpec {
+  const spec = createEmptyCharacterSpec(uid('char'));
+  const tokens = tokenize(prompt);
+  const lowerText = prompt.toLowerCase();
+
+  // --- Gender ---
+  const gender = findKeyword(tokens, GENDER_KEYWORDS);
+  if (gender) {
+    spec.gender = gender;
+  }
+
+  // --- Age ---
+  const numericAge = extractNumericAge(prompt);
+  if (numericAge !== null) {
+    spec.age.exact = numericAge;
+    spec.age.category = ageToCategory(numericAge);
+  } else {
+    const ageCat = findKeyword(tokens, AGE_CATEGORY_KEYWORDS);
+    if (ageCat) {
+      spec.age.category = ageCat;
+    }
+  }
+
+  // --- Body build ---
+  const build = findKeyword(tokens, BODY_BUILD_KEYWORDS);
+  if (build) {
+    spec.bodyBuild = build;
+  }
+
+  // --- Height ---
+  const height = findKeyword(tokens, HEIGHT_KEYWORDS);
+  if (height) {
+    spec.height = height;
+  }
+
+  // --- Hair style ---
+  const hairStyle = findKeyword(tokens, HAIR_STYLE_KEYWORDS);
+  if (hairStyle) {
+    spec.hair.style = hairStyle;
+  }
+
+  // --- Hair color ---
+  const hairColor = findKeyword(tokens, HAIR_COLOR_KEYWORDS);
+  if (hairColor) {
+    spec.hair.color = hairColor;
+  }
+
+  // --- Skin tone ---
+  const skinTone = findKeyword(tokens, SKIN_TONE_KEYWORDS);
+  if (skinTone) {
+    spec.skinTone = skinTone;
+  }
+
+  // --- Occupation ---
+  const occupation = findKeyword(tokens, OCCUPATION_KEYWORDS);
+  if (occupation) {
+    spec.occupation = occupation;
+  }
+
+  // --- Clothing ---
+  const clothing = findKeyword(tokens, CLOTHING_KEYWORDS);
+  if (clothing) {
+    spec.clothing = clothing;
+  }
+
+  // --- Accessories ---
+  const accessories = findAllKeywords(tokens, ACCESSORY_KEYWORDS);
+  if (accessories.length > 0) {
+    spec.accessories = accessories.map(type => ({ type }));
+  }
+
+  // --- Notes: store the original prompt ---
+  spec.notes = prompt;
+
+  return spec;
+}
