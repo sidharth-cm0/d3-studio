@@ -4,25 +4,39 @@
    ========================================================================== */
 
 :root {
-  /* Core palette */
-  --d3-bg:              #090909;
-  --d3-surface-1:       #111111;
-  --d3-surface-2:       #171717;
-  --d3-surface-3:       #1d1d1d;
-  --d3-border:          #292929;
-  --d3-border-hover:    #3a3a3a;
-  --d3-border-strong:   #555555;
+  /* Brand palette */
+  --d3-black:           #030507;
+  --d3-charcoal:        #0A0F13;
+  --d3-panel:           #11171B;
+  --d3-border:          #1D2A31;
 
-  /* Text */
-  --d3-text:            #f2f2f2;
-  --d3-text-secondary:  #a0a0a0;
-  --d3-text-muted:      #6f6f6f;
-  --d3-text-disabled:   #4b4b4b;
+  --d3-cyan:            #119AB0;
+  --d3-blue:            #0B6E86;
+  --d3-steel:           #497D8A;
 
-  /* Accents — single restrained light accent for primary CTA */
-  --d3-accent:          #ededed;
-  --d3-accent-hover:    #ffffff;
-  --d3-accent-text:     #111111;
+  --d3-amber:           #E9A713;
+  --d3-copper:          #9A4E08;
+
+  --d3-text:            #E8EEEE;
+  --d3-muted:           #819099;
+
+  /* Core palette mappings */
+  --d3-bg:              var(--d3-black);
+  --d3-surface-1:       var(--d3-charcoal);
+  --d3-surface-2:       var(--d3-panel);
+  --d3-surface-3:       #172228;
+  --d3-border-hover:    var(--d3-steel);
+  --d3-border-strong:   var(--d3-steel);
+
+  /* Text mapping */
+  --d3-text-secondary:  var(--d3-muted);
+  --d3-text-muted:      #53636B;
+  --d3-text-disabled:   #2A3A42;
+
+  /* Accents */
+  --d3-accent:          var(--d3-cyan);
+  --d3-accent-hover:    #16b4cb;
+  --d3-accent-text:     #030507;
 
   /* Semantic — muted, professional */
   --d3-danger:          #ef4444;

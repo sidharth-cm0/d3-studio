@@ -38,6 +38,7 @@ import type { D3Performance } from './types/d3'
 import './styles/design-system.css'
 import './App.css'
 import { Button } from './components/ui/Button'
+import { D3CinematicIntro, type D3IntroMode } from './components/D3CinematicIntro'
 
 // Reuse the browser HTTP/memory cache across VRM loads so React StrictMode's
 // double initial mount (and any repeat load of the same URL) never triggers a
@@ -383,6 +384,7 @@ export default function App() {
   const [status, setStatus] = useState<string>('D3 Studio Ready')
   const [isExporting, setIsExporting] = useState<boolean>(false)
   const [showCustomizer, setShowCustomizer] = useState<boolean>(false)
+  const [showCinematicIntro, setShowCinematicIntro] = useState<boolean>(true)
 
   // --- D3 Visual Style Engine (Phase 1) -------------------------------------
   // 'default' preserves the pre-style-engine look exactly (identity op).
@@ -3327,13 +3329,42 @@ const camera = new THREE.PerspectiveCamera(42, currentMount.clientWidth / curren
     applyCustomAvatarFeatures(actor1VrmRef.current)
   }, [skinColor, hairColor, shirtColor, hairStyle, jawScale, shoulderWidth])
 
+  const enterFromCinematicIntro = (introMode: D3IntroMode) => {
+    setShowCinematicIntro(false)
+    setShowCustomizer(false)
+
+    if (introMode === 'ai') {
+      setMode('story')
+      setShowTimeline(true)
+      setStatus('🧠 AI Mode armed — generate a story to direct the stage')
+      return
+    }
+
+    setMode('script')
+    setShowTimeline(true)
+    setStatus('🎬 Director Mode armed — script and block the scene manually')
+  }
+
   return (
     <div className="d3-app">
+      {showCinematicIntro && (
+        <D3CinematicIntro
+          onSelectMode={enterFromCinematicIntro}
+          onSkip={() => enterFromCinematicIntro('ai')}
+        />
+      )}
+
       {/* Top Bar */}
       <div className="d3-app__topbar">
         <div className="d3-app__topbar-left">
           <div className="d3-logo">D3 STUDIO</div>
           <div className="d3-nav">
+            <button
+              className="d3-nav-item"
+              onClick={() => setShowCinematicIntro(true)}
+            >
+              Intro
+            </button>
             <button
               className={`d3-nav-item ${mode === 'story' ? 'd3-nav-item--active' : ''}`}
               onClick={() => setMode('story')}
