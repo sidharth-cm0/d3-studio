@@ -6,9 +6,9 @@ export type CinematicState =
   | 'CLAPBOARD_READY'
   | 'CLAP'
   | 'CAMERA_TRAVEL'
-  | 'GORILLA_REVEAL'
-  | 'GORILLA_IDLE'
-  | 'GORILLA_SMOKE'
+  | 'WOLF_REVEAL'
+  | 'WOLF_IDLE'
+  | 'WOLF_SMOKE'
   | 'EXHALE'
   | 'CIGAR_THROW'
   | 'CIGAR_IMPACT'
@@ -27,9 +27,9 @@ export const CINEMATIC_STATE_ORDER: CinematicState[] = [
   'CLAPBOARD_READY',
   'CLAP',
   'CAMERA_TRAVEL',
-  'GORILLA_REVEAL',
-  'GORILLA_IDLE',
-  'GORILLA_SMOKE',
+  'WOLF_REVEAL',
+  'WOLF_IDLE',
+  'WOLF_SMOKE',
   'EXHALE',
   'CIGAR_THROW',
   'CIGAR_IMPACT',
@@ -46,10 +46,10 @@ export const ALLOWED_TRANSITIONS: Record<CinematicState, CinematicState[]> = {
   STUDIO_REVEAL: ['CLAPBOARD_READY', 'EXIT'],
   CLAPBOARD_READY: ['CLAP', 'EXIT'],
   CLAP: ['CAMERA_TRAVEL', 'EXIT'],
-  CAMERA_TRAVEL: ['GORILLA_REVEAL', 'EXIT'],
-  GORILLA_REVEAL: ['GORILLA_IDLE', 'EXIT'],
-  GORILLA_IDLE: ['GORILLA_SMOKE', 'EXIT'],
-  GORILLA_SMOKE: ['EXHALE', 'EXIT'],
+  CAMERA_TRAVEL: ['WOLF_REVEAL', 'EXIT'],
+  WOLF_REVEAL: ['WOLF_IDLE', 'EXIT'],
+  WOLF_IDLE: ['WOLF_SMOKE', 'EXIT'],
+  WOLF_SMOKE: ['EXHALE', 'EXIT'],
   EXHALE: ['CIGAR_THROW', 'EXIT'],
   CIGAR_THROW: ['CIGAR_IMPACT', 'EXIT'],
   CIGAR_IMPACT: ['IGNITION', 'EXIT'],
@@ -74,9 +74,9 @@ const INTRO_CUES: TimelineCue[] = [
 const POST_CLAP_CUES: TimelineCue[] = [
   { at: 0, state: 'CLAP' },
   { at: 330, state: 'CAMERA_TRAVEL' },
-  { at: 1720, state: 'GORILLA_REVEAL' },
-  { at: 3040, state: 'GORILLA_IDLE' },
-  { at: 4040, state: 'GORILLA_SMOKE' },
+  { at: 1720, state: 'WOLF_REVEAL' },
+  { at: 3040, state: 'WOLF_IDLE' },
+  { at: 4040, state: 'WOLF_SMOKE' },
   { at: 5480, state: 'EXHALE' },
   { at: 7040, state: 'CIGAR_THROW' },
   { at: 8180, state: 'CIGAR_IMPACT' },

@@ -213,8 +213,8 @@
 }
 
 .d3-cinematic-intro--camera-travel .d3-cinematic-clapboard-stage,
-.d3-cinematic-intro--gorilla-reveal .d3-cinematic-clapboard-stage,
-.d3-cinematic-intro--gorilla-idle .d3-cinematic-clapboard-stage {
+.d3-cinematic-intro--wolf-reveal .d3-cinematic-clapboard-stage,
+.d3-cinematic-intro--wolf-idle .d3-cinematic-clapboard-stage {
   animation: d3-clapboard-stage-out 700ms cubic-bezier(.66, 0, .34, 1) both;
 }
 

@@ -3,12 +3,14 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import type { CinematicState, D3IntroMode, QualityTier } from './CinematicTimeline'
 import { isAtOrAfter } from './CinematicTimeline'
 
-const GORILLA_URL = '/assets/cinematic/gorilla-main-monkey-vr-preview.glb'
+const WOLF_URL = '/assets/cinematic/quaternius-wolf.glb'
+const WOLF_IDLE_CLIP = 'Idle'
+const WOLF_IDLE_2_CLIP = 'Idle_2'
 
 interface SceneOptions {
   quality: QualityTier
   reducedMotion: boolean
-  onGorillaLoaded?: (loaded: boolean) => void
+  onWolfLoaded?: (loaded: boolean) => void
   onRenderParticleLayer?: (dt: number, now: number, stateAge: number) => void
 }
 
@@ -24,17 +26,17 @@ const CAMERA_RIGS: Record<CinematicState, CameraRig> = {
   CLAPBOARD_READY: { position: new THREE.Vector3(0, 1.5, 6.6), target: new THREE.Vector3(0, 1.1, -0.2), fov: 48 },
   CLAP: { position: new THREE.Vector3(0, 1.5, 6.35), target: new THREE.Vector3(0, 1.1, -0.25), fov: 46 },
   CAMERA_TRAVEL: { position: new THREE.Vector3(0.18, 1.38, 3.8), target: new THREE.Vector3(0.02, 1.05, -1.55), fov: 42 },
-  GORILLA_REVEAL: { position: new THREE.Vector3(0.24, 1.26, 3.25), target: new THREE.Vector3(0.08, 1.06, -0.42), fov: 38 },
-  GORILLA_IDLE: { position: new THREE.Vector3(0.12, 1.18, 2.72), target: new THREE.Vector3(0.03, 1.05, -0.25), fov: 34 },
-  GORILLA_SMOKE: { position: new THREE.Vector3(0.03, 1.16, 2.54), target: new THREE.Vector3(0.0, 1.1, -0.18), fov: 32 },
-  EXHALE: { position: new THREE.Vector3(-0.08, 1.18, 2.48), target: new THREE.Vector3(0.02, 1.12, -0.18), fov: 31 },
-  CIGAR_THROW: { position: new THREE.Vector3(0.1, 1.1, 2.62), target: new THREE.Vector3(0.42, 0.78, -0.32), fov: 34 },
-  CIGAR_IMPACT: { position: new THREE.Vector3(0.22, 0.94, 2.9), target: new THREE.Vector3(0.1, 0.36, -0.15), fov: 37 },
-  IGNITION: { position: new THREE.Vector3(0.16, 0.98, 2.78), target: new THREE.Vector3(0.02, 0.46, -0.12), fov: 36 },
-  PAPER_BURN: { position: new THREE.Vector3(0.04, 1.1, 3.12), target: new THREE.Vector3(0, 0.68, -0.25), fov: 39 },
-  MODES_REVEAL: { position: new THREE.Vector3(0.0, 1.13, 3.35), target: new THREE.Vector3(0, 0.84, -0.32), fov: 41 },
-  MODES_READY: { position: new THREE.Vector3(0.0, 1.14, 3.38), target: new THREE.Vector3(0, 0.86, -0.34), fov: 41 },
-  MODE_SELECTED: { position: new THREE.Vector3(0, 1.02, 2.3), target: new THREE.Vector3(0, 0.82, -0.42), fov: 31 },
+  WOLF_REVEAL: { position: new THREE.Vector3(0.55, 0.86, 2.35), target: new THREE.Vector3(0.05, 0.72, -0.35), fov: 36 },
+  WOLF_IDLE: { position: new THREE.Vector3(0.34, 0.78, 1.95), target: new THREE.Vector3(0.02, 0.68, -0.28), fov: 33 },
+  WOLF_SMOKE: { position: new THREE.Vector3(0.16, 0.76, 1.78), target: new THREE.Vector3(0.0, 0.72, -0.22), fov: 31 },
+  EXHALE: { position: new THREE.Vector3(-0.1, 0.78, 1.74), target: new THREE.Vector3(0.02, 0.74, -0.22), fov: 30 },
+  CIGAR_THROW: { position: new THREE.Vector3(0.1, 0.74, 1.9), target: new THREE.Vector3(0.42, 0.5, -0.32), fov: 33 },
+  CIGAR_IMPACT: { position: new THREE.Vector3(0.22, 0.68, 2.2), target: new THREE.Vector3(0.1, 0.34, -0.15), fov: 36 },
+  IGNITION: { position: new THREE.Vector3(0.16, 0.7, 2.1), target: new THREE.Vector3(0.02, 0.4, -0.12), fov: 35 },
+  PAPER_BURN: { position: new THREE.Vector3(0.04, 0.8, 2.45), target: new THREE.Vector3(0, 0.52, -0.25), fov: 38 },
+  MODES_REVEAL: { position: new THREE.Vector3(0.0, 0.84, 2.7), target: new THREE.Vector3(0, 0.58, -0.32), fov: 40 },
+  MODES_READY: { position: new THREE.Vector3(0.0, 0.86, 2.75), target: new THREE.Vector3(0, 0.6, -0.34), fov: 40 },
+  MODE_SELECTED: { position: new THREE.Vector3(0, 0.76, 2.0), target: new THREE.Vector3(0, 0.58, -0.42), fov: 30 },
   EXIT: { position: new THREE.Vector3(0, 1.02, 1.72), target: new THREE.Vector3(0, 0.82, -0.42), fov: 25 },
 }
 
@@ -70,7 +72,7 @@ function smoothstep(edge0: number, edge1: number, value: number) {
 export class CinematicScene {
   private readonly quality: QualityTier
   private readonly reducedMotion: boolean
-  private readonly onGorillaLoaded?: (loaded: boolean) => void
+  private readonly onWolfLoaded?: (loaded: boolean) => void
   private readonly onRenderParticleLayer?: (dt: number, now: number, stateAge: number) => void
   private readonly scene = new THREE.Scene()
   private readonly camera = new THREE.PerspectiveCamera(54, 1, 0.05, 80)
@@ -80,7 +82,7 @@ export class CinematicScene {
   private readonly rootGroup = new THREE.Group()
   private readonly studioGroup = new THREE.Group()
   private readonly tunnelGroup = new THREE.Group()
-  private readonly gorillaRig = new THREE.Group()
+  private readonly wolfRig = new THREE.Group()
   private readonly accessories = new THREE.Group()
   private readonly cigarRig = new THREE.Group()
   private readonly paperRig = new THREE.Group()
@@ -99,20 +101,20 @@ export class CinematicScene {
   private paused = false
   private selectedMode: D3IntroMode | null = null
   private hoveredMode: D3IntroMode | null = null
-  private gorillaObject: THREE.Object3D | null = null
-  private gorillaMixer: THREE.AnimationMixer | null = null
-  private gorillaAssetLoaded = false
-  private gorillaBaseHeight = 0.7
-  private gorillaHeadAnchor = new THREE.Vector3(0.02, 1.32, -0.22)
-  private gorillaCigarAnchor = new THREE.Vector3(0.48, 1.02, 0.18)
-  private gorillaHeadRadius = 0.36
-  private gorillaHeightScale = 1
+  private wolfObject: THREE.Object3D | null = null
+  private wolfMixer: THREE.AnimationMixer | null = null
+  private wolfIdleAction: THREE.AnimationAction | null = null
+  private wolfAssetLoaded = false
+  private wolfHeadAnchor = new THREE.Vector3(0.02, 1.32, -0.22)
+  private wolfCigarAnchor = new THREE.Vector3(0.48, 1.02, 0.18)
+  private wolfHeadRadius = 0.36
+  private wolfHeightScale = 1
   private travelRibbons: THREE.Mesh[] = []
 
   constructor(options: SceneOptions) {
     this.quality = options.quality
     this.reducedMotion = options.reducedMotion
-    this.onGorillaLoaded = options.onGorillaLoaded
+    this.onWolfLoaded = options.onWolfLoaded
     this.onRenderParticleLayer = options.onRenderParticleLayer
 
     this.renderer = new THREE.WebGLRenderer({
@@ -127,14 +129,14 @@ export class CinematicScene {
     this.renderer.setPixelRatio(this.pixelRatio())
     this.scene.fog = new THREE.FogExp2(0x02060a, 0.11)
     this.scene.add(this.rootGroup)
-    this.rootGroup.add(this.studioGroup, this.tunnelGroup, this.gorillaRig, this.paperRig)
-    this.gorillaRig.add(this.accessories, this.cigarRig)
+    this.rootGroup.add(this.studioGroup, this.tunnelGroup, this.wolfRig, this.paperRig)
+    this.wolfRig.add(this.accessories, this.cigarRig)
     this.buildLights()
     this.buildStudio()
     this.buildAccessories()
     this.buildThrownCigar()
     this.buildBurningPapers()
-    this.loadGorilla()
+    this.loadWolf()
   }
 
   mount(container: HTMLElement) {
@@ -151,8 +153,16 @@ export class CinematicScene {
     if (state === this.currentState) return
     this.currentState = state
     this.stateEnteredAt = performance.now()
-    if (state === 'CIGAR_THROW') this.prepareThrownCigar()
-    if (state === 'CIGAR_IMPACT') this.setImpactCigar()
+    if (state === 'CIGAR_THROW') {
+      this.thrownCigar.visible = true
+      this.thrownCigar.position.set(0.5, 1.05, 0.02)
+      this.thrownCigar.rotation.set(1.1, 0.2, -0.9)
+    }
+    if (state === 'CIGAR_IMPACT') {
+      this.thrownCigar.visible = true
+      this.thrownCigar.position.set(0.03, 0.37, -0.42)
+      this.thrownCigar.rotation.set(1.48, 0.55, 0.8)
+    }
   }
 
   setPointer(x: number, y: number) {
@@ -172,6 +182,31 @@ export class CinematicScene {
     this.hoveredMode = mode
   }
 
+  /**
+   * Project the two burning papers + the cigar impact point into canvas-space
+   * pixel coordinates so the 2D particle layer can anchor fire EXACTLY on the
+   * paper edges instead of guessing fixed screen fractions.
+   */
+  getFireAnchors(width: number, height: number): {
+    ai: { x: number; y: number }
+    director: { x: number; y: number }
+    ignition: { x: number; y: number }
+  } | null {
+    if (!this.paperMeshes.ai || !this.paperMeshes.director) return null
+    const project = (obj: THREE.Object3D, lift: number) => {
+      const p = obj.getWorldPosition(new THREE.Vector3())
+      p.y += lift
+      p.project(this.camera)
+      return { x: (p.x * 0.5 + 0.5) * width, y: (-p.y * 0.5 + 0.5) * height }
+    }
+    const impact = new THREE.Vector3(0.03, 0.37, -0.42).project(this.camera)
+    return {
+      ai: project(this.paperMeshes.ai, 0.16),
+      director: project(this.paperMeshes.director, 0.16),
+      ignition: { x: (impact.x * 0.5 + 0.5) * width, y: (-impact.y * 0.5 + 0.5) * height },
+    }
+  }
+
   dispose() {
     window.removeEventListener('resize', this.resize)
     cancelAnimationFrame(this.animationFrame)
@@ -179,9 +214,9 @@ export class CinematicScene {
       this.container.removeChild(this.renderer.domElement)
     }
     disposeObject(this.rootGroup)
-    this.gorillaMixer = null
-    this.gorillaObject = null
-    this.gorillaAssetLoaded = false
+    this.wolfMixer = null
+    this.wolfObject = null
+    this.wolfAssetLoaded = false
     this.renderer.dispose()
     this.container = null
   }
@@ -242,6 +277,7 @@ export class CinematicScene {
   }
 
   private buildStudio() {
+    // … unchanged studio build (floor/pillars/beams/practicals/table/reflection/ribbons)
     const floorMat = new THREE.MeshStandardMaterial({
       color: 0x080b0f,
       roughness: 0.38,
@@ -315,28 +351,32 @@ export class CinematicScene {
     }
   }
 
-  private loadGorilla() {
+  private loadWolf() {
     this.loader.load(
-      GORILLA_URL,
+      WOLF_URL,
       (gltf) => {
         const object = gltf.scene
-        object.name = 'cinematic:licensed-primate-main-monkey-vr'
+        object.name = 'cinematic:licensed-quaternius-wolf'
         const box = new THREE.Box3().setFromObject(object)
         const size = new THREE.Vector3()
         const center = new THREE.Vector3()
         box.getSize(size)
         box.getCenter(center)
-        const scale = 1.32 / Math.max(size.x, size.y, size.z, 0.001)
+        // Wolf is quadruped: normalize so feet rest exactly on the studio floor
+        // (y=0) and the standing height reads ~1.15 units — dominant, grounded.
+        const scale = 1.15 / Math.max(size.y, 0.001)
         object.scale.setScalar(scale)
-        object.position.sub(center.multiplyScalar(scale))
-        object.position.y += this.gorillaBaseHeight
-        object.position.z -= 0.25
-        object.rotation.y = Math.PI
+        object.position.x -= center.x * scale
+        object.position.z -= center.z * scale
+        object.position.y -= box.min.y * scale
+        object.rotation.y = 0.16 // subtle angular pose facing camera-left
         object.updateMatrixWorld(true)
-        this.gorillaHeadAnchor = this.findGorillaAnchor(object, 'head') ?? new THREE.Vector3(0.02, 1.32, -0.22)
-        this.gorillaCigarAnchor = this.findGorillaAnchor(object, 'hand') ?? new THREE.Vector3(0.48, 1.02, 0.18)
-        this.gorillaHeightScale = size.y * scale / 1.32
-        this.gorillaHeadRadius = Math.max(0.22, Math.min(0.48, size.y * scale * 0.19))
+        this.wolfHeadAnchor = this.findWolfAnchor(object, 'head') ?? new THREE.Vector3(0.02, 1.32, -0.22)
+        // Cigar is held in the wolf's muzzle (noir presentation) — derived from
+        // the head anchor with a forward/down offset in wolf-local space.
+        this.wolfCigarAnchor = this.wolfHeadAnchor.clone().add(new THREE.Vector3(0.04, -0.09, 0.3))
+        this.wolfHeightScale = Math.max(0.6, Math.min(1.4, this.wolfHeadAnchor.y / 1.1))
+        this.wolfHeadRadius = Math.max(0.2, Math.min(0.44, this.wolfHeadAnchor.y * 0.26))
         object.traverse((node) => {
           const mesh = node as THREE.Mesh
           if (!mesh.isMesh) return
@@ -346,59 +386,83 @@ export class CinematicScene {
             const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
             materials.forEach((mat) => {
               if ('color' in mat && mat.color instanceof THREE.Color) {
-                mat.color.multiplyScalar(0.34)
-                mat.color.offsetHSL(0, -0.12, -0.12)
+                mat.color.multiplyScalar(0.32)
+                mat.color.offsetHSL(0, -0.06, -0.1)
               }
               mat.needsUpdate = true
             })
           }
         })
-        this.gorillaRig.add(object)
-        this.gorillaObject = object
-        this.gorillaAssetLoaded = true
+        this.wolfRig.add(object)
+        this.wolfObject = object
+        this.wolfAssetLoaded = true
+        // Play the Quaternius Idle clip if present; fade Idle_2 over to Idle with a subtle crossfade.
         if (gltf.animations.length > 0) {
-          this.gorillaMixer = new THREE.AnimationMixer(object)
-          const action = this.gorillaMixer.clipAction(gltf.animations[0])
-          action.play()
+          this.wolfMixer = new THREE.AnimationMixer(object)
+          const idle = gltf.animations.find((clip) => clip.name === WOLF_IDLE_CLIP) ?? gltf.animations[0]
+          const idle2 = gltf.animations.find((clip) => clip.name === WOLF_IDLE_2_CLIP)
+          const primary = this.wolfMixer.clipAction(idle)
+          primary.play()
+          if (idle2) {
+            const alt = this.wolfMixer.clipAction(idle2)
+            alt.play()
+            alt.crossFadeTo(primary, 0.6, false)
+          }
+          this.wolfIdleAction = primary
         }
-        this.syncAccessoriesToGorilla()
-        this.onGorillaLoaded?.(true)
+        this.syncAccessoriesToWolf()
+        this.onWolfLoaded?.(true)
       },
       undefined,
       (error) => {
-        console.warn('[D3 CINEMATIC] Licensed primate GLB failed to load; continuing without a geometric substitute.', error)
-        this.gorillaAssetLoaded = false
-        this.onGorillaLoaded?.(false)
+        console.warn('[D3 CINEMATIC] Licensed wolf GLB failed to load; continuing without a geometric substitute.', error)
+        this.wolfAssetLoaded = false
+        this.onWolfLoaded?.(false)
       }
     )
   }
 
-  private findGorillaAnchor(root: THREE.Object3D, kind: 'head' | 'hand'): THREE.Vector3 | null {
+  private findWolfAnchor(root: THREE.Object3D, kind: 'head' | 'hand'): THREE.Vector3 | null {
+    // Prefer actual armature node if present, else heuristic bounds
+    let result: THREE.Vector3 | null = null
+    root.traverse((node) => {
+      const name = node.name || ''
+      if (kind === 'head' && /head|neck/i.test(name) && !result) {
+        const pos = node.getWorldPosition(new THREE.Vector3())
+        result = root.worldToLocal(pos)
+      }
+      if (kind === 'hand' && /hand|paw|foot/i.test(name) && !result) {
+        const pos = node.getWorldPosition(new THREE.Vector3())
+        result = root.worldToLocal(pos)
+      }
+    })
+    if (result) return result
     const bounds = new THREE.Box3().setFromObject(root)
     const size = bounds.getSize(new THREE.Vector3())
     const center = bounds.getCenter(new THREE.Vector3())
     const anchor = new THREE.Vector3(
-      kind === 'hand' ? center.x + size.x * 0.34 : center.x,
-      kind === 'hand' ? center.y - size.y * 0.08 : center.y + size.y * 0.22,
-      center.z + size.z * 0.46
+      kind === 'hand' ? center.x + size.x * 0.3 : center.x,
+      kind === 'hand' ? center.y - size.y * 0.08 : center.y + size.y * 0.2,
+      center.z
     )
     root.worldToLocal(anchor)
     return anchor
   }
 
-  private syncAccessoriesToGorilla() {
-    if (!this.gorillaObject) return
-    const head = this.gorillaObject.localToWorld(this.gorillaHeadAnchor.clone())
-    const hand = this.gorillaObject.localToWorld(this.gorillaCigarAnchor.clone())
+  private syncAccessoriesToWolf() {
+    if (!this.wolfObject) return
+    const head = this.wolfObject.localToWorld(this.wolfHeadAnchor.clone())
+    const hand = this.wolfObject.localToWorld(this.wolfCigarAnchor.clone())
     const headDelta = head.sub(new THREE.Vector3(0.02, 1.32, -0.22))
-    const headScale = this.gorillaHeadRadius / 0.36
+    const headScale = this.wolfHeadRadius / 0.36
     this.accessories.position.copy(headDelta)
     this.accessories.scale.setScalar(headScale)
     this.cigarRig.position.copy(hand.sub(new THREE.Vector3(0.37, 0.97, 0.09)))
-    this.cigarRig.scale.setScalar(this.gorillaHeightScale)
+    this.cigarRig.scale.setScalar(this.wolfHeightScale)
   }
 
   private buildAccessories() {
+    // headphones + cigar (attached to wolfRig via accessories/cigarRig)
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0x020405,
       roughness: 0.12,
@@ -445,7 +509,7 @@ export class CinematicScene {
     hand.scale.set(1.4, 0.82, 0.9)
 
     this.accessories.add(leftLens, rightLens, bridge, cupL, cupR, band)
-    hand.name = 'cinematic:gorilla-hand'
+    hand.name = 'cinematic:wolf-hand'
     this.cigarRig.add(hand, cigar, ember)
   }
 
@@ -515,18 +579,6 @@ export class CinematicScene {
     makePaper('director')
   }
 
-  private prepareThrownCigar() {
-    this.thrownCigar.visible = true
-    this.thrownCigar.position.set(0.5, 1.05, 0.02)
-    this.thrownCigar.rotation.set(1.1, 0.2, -0.9)
-  }
-
-  private setImpactCigar() {
-    this.thrownCigar.visible = true
-    this.thrownCigar.position.set(0.03, 0.37, -0.42)
-    this.thrownCigar.rotation.set(1.48, 0.55, 0.8)
-  }
-
   private updateCamera(dt: number, now: number, stateAge: number) {
     const rig = CAMERA_RIGS[this.currentState]
     const targetPosition = rig.position.clone()
@@ -563,16 +615,16 @@ export class CinematicScene {
     const t = now * 0.001
     const reveal = isAtOrAfter(this.currentState, 'STUDIO_REVEAL') ? 1 : 0
     this.studioGroup.visible = reveal > 0
-    this.tunnelGroup.visible = this.currentState === 'CAMERA_TRAVEL' || this.currentState === 'CLAP' || this.currentState === 'GORILLA_REVEAL'
-    this.gorillaRig.visible = this.gorillaAssetLoaded && isAtOrAfter(this.currentState, 'GORILLA_REVEAL')
+    this.tunnelGroup.visible = this.currentState === 'CAMERA_TRAVEL' || this.currentState === 'CLAP' || this.currentState === 'WOLF_REVEAL'
+    this.wolfRig.visible = this.wolfAssetLoaded && isAtOrAfter(this.currentState, 'WOLF_REVEAL')
     this.paperRig.visible = isAtOrAfter(this.currentState, 'IGNITION')
 
     const breathing = Math.sin(t * 2.15) * 0.018
-    this.gorillaMixer?.update(dt)
-    this.gorillaRig.position.y = breathing
-    this.gorillaRig.rotation.y = Math.sin(t * 0.84) * 0.025 + this.pointer.x * 0.035
-    this.gorillaRig.rotation.x = Math.sin(t * 0.48) * 0.008
-    this.gorillaRig.rotation.z = Math.sin(t * 0.7) * 0.018
+    this.wolfMixer?.update(dt)
+    this.wolfRig.position.y = breathing
+    this.wolfRig.rotation.y = Math.sin(t * 0.84) * 0.025 + this.pointer.x * 0.035
+    this.wolfRig.rotation.x = Math.sin(t * 0.48) * 0.008
+    this.wolfRig.rotation.z = Math.sin(t * 0.7) * 0.018
 
     this.updateCigar(now, stateAge)
     this.updateFireLight(now, stateAge)
@@ -583,7 +635,7 @@ export class CinematicScene {
   private updateCigar(now: number, stateAge: number) {
     const ember = this.cigarRig.getObjectByName('cinematic:cigar-held-ember') as THREE.Mesh | undefined
     const held = this.cigarRig.getObjectByName('cinematic:cigar-held')
-    const inhale = this.currentState === 'GORILLA_SMOKE'
+    const inhale = this.currentState === 'WOLF_SMOKE'
     const emberIntensity = inhale ? 0.75 + smoothstep(0.1, 1.25, stateAge) * 1.4 : isAtOrAfter(this.currentState, 'CIGAR_THROW') ? 0 : 0.45
     if (ember && ember.material instanceof THREE.MeshBasicMaterial) {
       ember.visible = !isAtOrAfter(this.currentState, 'CIGAR_THROW')

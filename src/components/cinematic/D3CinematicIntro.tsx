@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CinematicAudio } from './CinematicAudio'
-import { CinematicFire } from './CinematicFire'
+import { CinematicFire, type FireAnchors } from './CinematicFire'
 import { CinematicModeSelector } from './CinematicModeSelector'
 import { CinematicScene } from './CinematicScene'
 import { CinematicSmoke } from './CinematicSmoke'
@@ -82,6 +82,7 @@ function CinematicParticleCanvas({
   paused,
   hoveredMode,
   particleTickRef,
+  getFireAnchors,
   onImpact,
   onIgnition,
   onExhale,
@@ -92,6 +93,7 @@ function CinematicParticleCanvas({
   paused: boolean
   hoveredMode: D3IntroMode | null
   particleTickRef: React.MutableRefObject<((dt: number, now: number, stateAge: number) => void) | null>
+  getFireAnchors: (width: number, height: number) => FireAnchors | null
   onImpact: () => void
   onIgnition: () => void
   onExhale: () => void
@@ -160,6 +162,7 @@ function CinematicParticleCanvas({
       context.clearRect(0, 0, width, height)
 
       const liveState = stateRef.current
+      const fireAnchors = getFireAnchors(width, height)
       if (liveState === 'CLAP' && !eventMarkers.current.clap) {
         eventMarkers.current.clap = true
         fire.burstClap(width, height)
@@ -171,7 +174,7 @@ function CinematicParticleCanvas({
       }
       if (liveState === 'CIGAR_IMPACT' && !eventMarkers.current.impact) {
         eventMarkers.current.impact = true
-        fire.burstImpact(width, height)
+        fire.burstImpact(width, height, fireAnchors?.ignition)
         onImpact()
       }
       if (liveState === 'IGNITION' && !eventMarkers.current.ignition) {
@@ -180,9 +183,9 @@ function CinematicParticleCanvas({
       }
 
       smoke.draw(context, dt, now, liveState, stateAge, width, height)
-      fire.draw(context, dt, now, liveState, stateAge, width, height, hoveredModeRef.current)
+      fire.draw(context, dt, now, liveState, stateAge, width, height, hoveredModeRef.current, fireAnchors)
     }
-  }, [onExhale, onIgnition, onImpact, particleTickRef])
+  }, [getFireAnchors, onExhale, onIgnition, onImpact, particleTickRef])
 
   return <canvas ref={canvasRef} className="d3-cinematic-particles" aria-hidden="true" />
 }
@@ -195,7 +198,7 @@ export function D3CinematicIntro({ onSelectMode, onSkip }: D3CinematicIntroProps
   const [paused, setPaused] = useState(false)
   const [selectedMode, setSelectedMode] = useState<D3IntroMode | null>(null)
   const [hoveredMode, setHoveredMode] = useState<D3IntroMode | null>(null)
-  const [gorillaAssetStatus, setGorillaAssetStatus] = useState<'loading' | 'loaded' | 'unavailable'>('loading')
+  const [wolfAssetStatus, setWolfAssetStatus] = useState<'loading' | 'loaded' | 'unavailable'>('loading')
   const rootRef = useRef<HTMLDivElement | null>(null)
   const webglHostRef = useRef<HTMLDivElement | null>(null)
   const sceneRef = useRef<CinematicScene | null>(null)
@@ -241,7 +244,7 @@ export function D3CinematicIntro({ onSelectMode, onSkip }: D3CinematicIntroProps
     const scene = new CinematicScene({
       quality,
       reducedMotion,
-      onGorillaLoaded: (loaded) => setGorillaAssetStatus(loaded ? 'loaded' : 'unavailable'),
+      onWolfLoaded: (loaded) => setWolfAssetStatus(loaded ? 'loaded' : 'unavailable'),
       onRenderParticleLayer: (dt, now, stateAge) => particleTickRef.current?.(dt, now, stateAge),
     })
     sceneRef.current = scene
@@ -372,6 +375,7 @@ export function D3CinematicIntro({ onSelectMode, onSkip }: D3CinematicIntroProps
         paused={paused}
         hoveredMode={hoveredMode}
         particleTickRef={particleTickRef}
+        getFireAnchors={(w, h) => sceneRef.current?.getFireAnchors(w, h) ?? null}
         onImpact={handleImpact}
         onIgnition={handleIgnition}
         onExhale={handleExhale}
@@ -402,18 +406,18 @@ export function D3CinematicIntro({ onSelectMode, onSkip }: D3CinematicIntroProps
       <div className="d3-cinematic-status" aria-live="polite">
         <span>{state.replace(/_/g, ' ')}</span>
         <strong>
-          {gorillaAssetStatus === 'loaded'
-            ? 'LICENSED PRIMATE ASSET LOADED'
-            : gorillaAssetStatus === 'unavailable'
-              ? 'PRIMATE ASSET UNAVAILABLE — NO FAKE SUBSTITUTE'
-              : 'LOADING LICENSED PRIMATE ASSET'}
+          {wolfAssetStatus === 'loaded'
+            ? 'LICENSED WOLF ASSET LOADED'
+            : wolfAssetStatus === 'unavailable'
+              ? 'WOLF ASSET UNAVAILABLE — NO FAKE SUBSTITUTE'
+              : 'LOADING LICENSED WOLF ASSET'}
         </strong>
       </div>
 
       {clapboardVisible && <CinematicClapboard ready={canClap} closing={state === 'CLAP'} onClap={handleClap} />}
 
       <div className="d3-cinematic-sequence-caption" aria-hidden={state === 'BOOT'}>
-        {state === 'GORILLA_SMOKE' && 'Ember climbs. Breath draws in.'}
+        {state === 'WOLF_SMOKE' && 'Ember climbs. Breath draws in.'}
         {state === 'EXHALE' && 'Smoke rolls through the cold rim light.'}
         {state === 'CIGAR_THROW' && 'The cigar leaves the hand.'}
         {state === 'CIGAR_IMPACT' && 'Impact before ignition.'}

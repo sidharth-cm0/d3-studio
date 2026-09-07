@@ -35,7 +35,7 @@ export class CinematicSmoke {
     width: number,
     height: number
   ) {
-    const activelySmoking = state === 'GORILLA_SMOKE' || state === 'EXHALE'
+    const activelySmoking = state === 'WOLF_SMOKE' || state === 'EXHALE'
     if (activelySmoking && !this.reducedMotion) {
       const emitRate = state === 'EXHALE' ? 28 : 9
       this.emitAccumulator += dt * emitRate
@@ -45,7 +45,7 @@ export class CinematicSmoke {
       }
     }
 
-    if (state === 'GORILLA_SMOKE' && stateAge < 0.38 && this.particles.length < 8) {
+    if (state === 'WOLF_SMOKE' && stateAge < 0.38 && this.particles.length < 8) {
       this.spawnMouth(width, height, false)
     }
 

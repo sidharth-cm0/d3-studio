@@ -4,21 +4,26 @@
    ========================================================================== */
 
 :root {
-  /* Brand palette */
-  --d3-black:           #030507;
-  --d3-charcoal:        #0A0F13;
-  --d3-panel:           #11171B;
-  --d3-border:          #1D2A31;
+  /* Brand palette — D3 graphic-print production system */
+  --d3-black:           #07090D;
+  --d3-charcoal:        #10141C;
+  --d3-panel:           #191E29;
+  --d3-border:          #2A3449;
 
-  --d3-cyan:            #119AB0;
-  --d3-blue:            #0B6E86;
-  --d3-steel:           #497D8A;
+  --d3-cyan:            #00D9FF;   /* electric cyan */
+  --d3-blue:            #176BFF;   /* cinematic blue */
+  --d3-steel:           #5C6B85;
 
-  --d3-amber:           #E9A713;
-  --d3-copper:          #9A4E08;
+  --d3-amber:           #FF9A32;   /* ember amber */
+  --d3-copper:          #FF5A1F;   /* flame orange */
+  --d3-warm-hi:         #FFC56E;   /* practical-light highlight */
+
+  --d3-crimson:         #FF285F;   /* graphic accent */
+  --d3-crimson-deep:    #E31B48;   /* deep crimson */
+  --d3-paper:           #E8DFCC;   /* aged ivory */
 
   --d3-text:            #E8EEEE;
-  --d3-muted:           #819099;
+  --d3-muted:           #9AA8BC;
 
   /* Core palette mappings */
   --d3-bg:              var(--d3-black);
@@ -541,3 +546,123 @@
 .d3-overflow-x-auto { overflow-x: auto; }
 
 .d3-hidden { display: none; }
+
+/* ==========================================================================
+   D3 GRAPHIC-PRINT SYSTEM — halftone / comic-print / kinetic typography
+   Reusable utilities for the D3 studio front-page identity.
+   ========================================================================== */
+
+/* Ben-Day-dot halftone texture */
+.d3-halftone {
+  position: relative;
+}
+.d3-halftone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.055) 12%, transparent 12.5%);
+  background-size: 3px 3px;
+  mix-blend-mode: screen;
+}
+.d3-halftone--cyan::after   { background-image: radial-gradient(circle, rgba(0,217,255,0.22) 10%, transparent 10.5%); }
+.d3-halftone--crimson::after { background-image: radial-gradient(circle, rgba(255,40,95,0.24) 10%, transparent 10.5%); }
+.d3-halftone--amber::after  { background-image: radial-gradient(circle, rgba(255,154,50,0.20) 10%, transparent 10.5%); }
+
+/* Print grain */
+.d3-print-grain {
+  position: relative;
+}
+.d3-print-grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 140 140' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+/* Ink offset / chromatic edge */
+.d3-ink-offset {
+  position: relative;
+}
+.d3-ink-offset::before,
+.d3-ink-offset::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.d3-ink-offset::before { color: rgba(0,217,255,0.35); transform: translate(-1px, 0); }
+.d3-ink-offset::after  { color: rgba(255,40,95,0.35);  transform: translate(1px, 0); }
+
+/* Chromatic edge separation */
+.d3-chroma {
+  text-shadow: 0.5px 0 var(--d3-crimson), -0.5px 0 var(--d3-cyan);
+}
+
+/* Graphic shadow shape */
+.d3-graphic-shadow { filter: drop-shadow(4px 5px 0 rgba(0,0,0,0.75)); }
+.d3-graphic-shadow--cyan   { filter: drop-shadow(4px 5px 0 rgba(0,217,255,0.30)); }
+.d3-graphic-shadow--crimson { filter: drop-shadow(4px 5px 0 rgba(255,40,95,0.30)); }
+
+/* Comic impact frame */
+.d3-impact-frame {
+  position: relative;
+}
+.d3-impact-frame::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border: 3px solid var(--d3-text);
+  border-radius: 3px;
+  opacity: 0.35;
+  pointer-events: none;
+  animation: d3-impact-pulse 0.5s steps(2, end) 2;
+}
+@keyframes d3-impact-pulse {
+  0%   { opacity: 0.75; }
+  50%  { opacity: 0.15; }
+  100% { opacity: 0.75; }
+}
+
+/* Stepped / low-frame animation */
+@keyframes d3-step-raf {
+  to { transform: translateY(0); }
+}
+.d3-stepped {
+  animation: d3-step-raf 0.7s steps(3, jump-none) infinite alternate;
+  transform: translateY(-3px);
+}
+.d3-stepped--x {
+  transform: translateX(-3px);
+  animation-name: d3-step-raf-x;
+}
+@keyframes d3-step-raf-x {
+  to { transform: translateX(0); }
+}
+
+/* Kinetic display typography */
+.d3-display {
+  font-size: clamp(28px, 6vw, 68px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+.d3-display--outline {
+  color: transparent;
+  -webkit-text-stroke: 1.5px var(--d3-text);
+}
+.d3-display--cy { color: var(--d3-cyan); }
+.d3-display--paper { color: var(--d3-paper); }
+.d3-vertical-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: var(--d3-font-size-sm);
+  color: var(--d3-text-muted);
+}
